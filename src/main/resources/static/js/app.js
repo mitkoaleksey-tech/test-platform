@@ -2588,3 +2588,49 @@ function closeModal() {
     const modal = document.getElementById('modal-container');
     if (modal) modal.remove();
 }
+
+// ==========================================
+// SPA ROUTER & INITIALIZATION
+// ==========================================
+function handleRoute() {
+    const hash = window.location.hash || '';
+
+    if (hash.startsWith('#test/')) {
+        const accessToken = hash.replace('#test/', '');
+        renderStudentTestView(accessToken);
+    } else if (hash === '#admin') {
+        if (!state.token || !state.user || state.user.role !== 'ADMIN') {
+            window.location.hash = '#login';
+            renderLoginView();
+        } else {
+            renderAdminDashboard();
+        }
+    } else if (hash === '#teacher') {
+        if (!state.token || !state.user) {
+            window.location.hash = '#login';
+            renderLoginView();
+        } else {
+            renderTeacherDashboard();
+        }
+    } else {
+        if (state.token && state.user) {
+            if (state.user.role === 'ADMIN') {
+                window.location.hash = '#admin';
+                renderAdminDashboard();
+            } else {
+                window.location.hash = '#teacher';
+                renderTeacherDashboard();
+            }
+        } else {
+            renderLoginView();
+        }
+    }
+}
+
+window.addEventListener('hashchange', handleRoute);
+window.addEventListener('DOMContentLoaded', handleRoute);
+
+// Execute immediately if DOM is already parsed
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    handleRoute();
+}
