@@ -816,8 +816,8 @@ async function uploadZipArchive(inputElement) {
                 if (progressStatus) {
                     progressStatus.innerHTML = `
                         <strong style="color: var(--success);">Файл передан на сервер!</strong><br>
-                        Выполняется распаковка ZIP, парсинг Excel и запись 11,000 задач в PostgreSQL.<br>
-                        <small style="color: var(--text-secondary);">Пожалуйста, подождите несколько секунд (не закрывайте окно)...</small>
+                        Выполняется распаковка ZIP, парсинг Excel и запись задач в PostgreSQL.<br>
+                        <small style="color: var(--text-secondary);">Пожалуйста, подождите (не закрывайте окно)...</small>
                     `;
                 }
             }
