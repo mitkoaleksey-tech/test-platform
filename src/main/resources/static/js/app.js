@@ -347,6 +347,7 @@ function logout() {
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('user_profile');
     window.location.hash = '#login';
+    renderLoginView();
 }
 
 // ==========================================
