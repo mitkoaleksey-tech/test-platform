@@ -479,11 +479,20 @@ async function loadAdminTabContent() {
     }
 }
 
-async function loadAdminTeachersTab(container) {
-    container.innerHTML = '<p style="text-align:center; padding: 2rem;">Загрузка списка преподавателей...</p>';
-    try {
-        const teachers = await apiFetch('/api/admin/users');
-        state.adminTeachers = teachers;
+async function loadAdminTeachersTab(container, forceRefresh = false) {
+    if (!state.adminTeachers || forceRefresh || !container.children.length) {
+        if (!container.children.length) {
+            container.innerHTML = '<p style="text-align:center; padding: 2rem; color: var(--text-secondary);">Загрузка списка преподавателей...</p>';
+        }
+        try {
+            const teachers = await apiFetch('/api/admin/users');
+            state.adminTeachers = teachers;
+        } catch (err) {
+            container.innerHTML = `<div class="badge badge-danger">Ошибка загрузки: ${err.message}</div>`;
+            return;
+        }
+    }
+    const teachers = state.adminTeachers || [];
 
         container.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
@@ -753,160 +762,271 @@ async function uploadZipArchive(inputElement) {
     const formData = new FormData();
     formData.append('file', file);
 
-    showToast('Импорт архива... Пожалуйста, подождите');
-    try {
-        const response = await fetch('/api/admin/tasks/import-zip', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${state.token || ''}` },
-            body: formData
-        });
-        const res = await response.json();
-        if (!response.ok) {
-            throw new Error(res.message || 'Ошибка импорта ZIP архива');
-        }
+    // Отрисовка модального окна с процентами прогресса импорта
+    const progressModalHtml = `
+        <div id="zip-progress-modal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 1.5rem;">
+            <div class="card" style="width: 100%; max-width: 480px; text-align: center; padding: 2rem;">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📦</div>
+                <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">Импорт архива задач</h3>
+                <p id="zip-progress-status" style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                    Подготовка файла ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} МБ)...
+                </p>
 
-        let msg = `Импорт успешно завершен!\nВсего обработано: ${res.totalProcessed}\nСоздано: ${res.createdCount}\nОбновлено: ${res.updatedCount}\nКартинок привязано: ${res.imagesAttachedCount}`;
-        if (res.warnings && res.warnings.length) {
-            msg += `\nПредупреждений: ${res.warnings.length}`;
-        }
-        showToast(msg, 'success');
-        loadAdminTabContent();
-    } catch (err) {
-        showToast(err.message, 'error');
+                <div style="width: 100%; height: 16px; background: var(--bg-hover); border-radius: 8px; overflow: hidden; margin-bottom: 0.8rem; position: relative;">
+                    <div id="zip-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); border-radius: 8px; transition: width 0.2s ease;"></div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">
+                    <span id="zip-progress-percent">0%</span>
+                    <span id="zip-progress-bytes">0 / ${(file.size / (1024 * 1024)).toFixed(1)} МБ</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', progressModalHtml);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/admin/tasks/import-zip', true);
+    if (state.token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${state.token}`);
     }
+
+    const progressBar = document.getElementById('zip-progress-bar');
+    const progressPercent = document.getElementById('zip-progress-percent');
+    const progressBytes = document.getElementById('zip-progress-bytes');
+    const progressStatus = document.getElementById('zip-progress-status');
+
+    xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            if (progressBar) progressBar.style.width = pct + '%';
+            if (progressPercent) progressPercent.innerText = pct + '%';
+            if (progressBytes) progressBytes.innerText = `${(e.loaded / (1024 * 1024)).toFixed(1)} / ${(e.total / (1024 * 1024)).toFixed(1)} МБ`;
+            if (progressStatus) progressStatus.innerText = pct < 100 ? `Загрузка файла архива на сервер (${pct}%)...` : 'Обработка Excel и сохранение задач в СУБД...';
+        }
+    };
+
+    xhr.onload = () => {
+        const modal = document.getElementById('zip-progress-modal');
+        if (modal) modal.remove();
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+                const res = JSON.parse(xhr.responseText);
+                let msg = `Импорт успешно завершен!\nВсего обработано: ${res.totalProcessed}\nСоздано: ${res.createdCount}\nОбновлено: ${res.updatedCount}\nКартинок привязано: ${res.imagesAttachedCount}`;
+                if (res.warnings && res.warnings.length) {
+                    msg += `\nПредупреждений: ${res.warnings.length}`;
+                }
+                showToast(msg, 'success');
+                loadAdminTabContent(true);
+            } catch (e) {
+                showToast('Архив загружен, обновляем список задач...', 'info');
+                loadAdminTabContent(true);
+            }
+        } else {
+            let errMessage = 'Ошибка импорта ZIP архива';
+            try {
+                const res = JSON.parse(xhr.responseText);
+                if (res.message) errMessage = res.message;
+            } catch (e) {}
+            showToast(errMessage, 'error');
+        }
+    };
+
+    xhr.onerror = () => {
+        const modal = document.getElementById('zip-progress-modal');
+        if (modal) modal.remove();
+        showToast('Сетевая ошибка при загрузке архива', 'error');
+    };
+
+    xhr.send(formData);
 }
 
 // ==========================================
 // ADMIN TASKS BANK
 // ==========================================
-async function loadAdminTasksTab(container) {
-    container.innerHTML = '<p style="text-align:center; padding: 2rem;">Загрузка банка задач...</p>';
-    try {
-        const [tasks, subjects, exams, banks] = await Promise.all([
-            apiFetch('/api/admin/tasks'),
-            apiFetch('/api/admin/dictionaries/subjects').catch(() => []),
-            apiFetch('/api/admin/dictionaries/exams').catch(() => []),
-            apiFetch('/api/admin/dictionaries/banks').catch(() => [])
-        ]);
+async function loadAdminTasksTab(container, forceRefresh = false) {
+    if (!state.adminTasks || forceRefresh) {
+        if (!container.children.length) {
+            container.innerHTML = '<p style="text-align:center; padding: 2rem; color: var(--text-secondary);">Загрузка банка задач...</p>';
+        }
+        try {
+            const [tasks, subjects, exams, banks] = await Promise.all([
+                apiFetch('/api/admin/tasks'),
+                apiFetch('/api/admin/dictionaries/subjects').catch(() => []),
+                apiFetch('/api/admin/dictionaries/exams').catch(() => []),
+                apiFetch('/api/admin/dictionaries/banks').catch(() => [])
+            ]);
 
-        state.adminTasks = tasks;
-        if (subjects.length) state.dictionaries.subjects = subjects;
-        if (exams.length) state.dictionaries.exams = exams;
-        if (banks.length) state.dictionaries.banks = banks;
-
-        const f = state.taskFilters;
-        const filteredTasks = tasks.filter(t => {
-            if (f.search && !t.publicId.toLowerCase().includes(f.search.toLowerCase())) return false;
-            if (f.subject && t.subject !== f.subject) return false;
-            if (f.exam && t.examType !== f.exam) return false;
-            if (f.bank && t.taskBank !== f.bank) return false;
-            if (f.subtopic && (!t.subtopic || !t.subtopic.toLowerCase().includes(f.subtopic.toLowerCase()))) return false;
-            return true;
-        });
-
-        container.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h2 style="font-size: 1.4rem; font-weight: 700;">Банк Задач (${filteredTasks.length} из ${tasks.length})</h2>
-                <div style="display: flex; gap: 0.5rem;">
-                    <input type="file" id="zip-file-input" accept=".zip" style="display: none;" onchange="uploadZipArchive(this)">
-                    <button onclick="document.getElementById('zip-file-input').click()" class="btn btn-secondary">Импорт из ZIP</button>
-                    <button onclick="renderCreateTaskModal()" class="btn btn-primary">+ Создать задачу</button>
-                </div>
-            </div>
-
-            <!-- Filters Bar -->
-            <div class="card" style="margin-bottom: 1rem; padding: 1rem;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.8rem;">
-                    <div>
-                        <label class="form-label" style="font-size:0.8rem;">Поиск по Public ID</label>
-                        <input type="text" id="task-filter-search" class="form-control" placeholder="T-1001..." value="${f.search || ''}" oninput="updateTaskFilterState('search', this.value)">
-                    </div>
-                    <div>
-                        <label class="form-label" style="font-size:0.8rem;">Предмет</label>
-                        <select id="task-filter-subject" class="form-control" onchange="updateTaskFilterState('subject', this.value)">
-                            <option value="">Все предметы</option>
-                            ${state.dictionaries.subjects.map(s => `<option value="${s.name}" ${f.subject === s.name ? 'selected' : ''}>${s.displayName}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label" style="font-size:0.8rem;">Экзамен</label>
-                        <select id="task-filter-exam" class="form-control" onchange="updateTaskFilterState('exam', this.value)">
-                            <option value="">Все экзамены</option>
-                            ${state.dictionaries.exams.map(e => `<option value="${e.name}" ${f.exam === e.name ? 'selected' : ''}>${e.displayName}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label" style="font-size:0.8rem;">Банк</label>
-                        <select id="task-filter-bank" class="form-control" onchange="updateTaskFilterState('bank', this.value)">
-                            <option value="">Все банки</option>
-                            ${state.dictionaries.banks.map(b => `<option value="${b.name}" ${f.bank === b.name ? 'selected' : ''}>${b.displayName}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label" style="font-size:0.8rem;">Подтема</label>
-                        <input type="text" id="task-filter-subtopic" class="form-control" placeholder="Поиск подтемы..." value="${f.subtopic || ''}" oninput="updateTaskFilterState('subtopic', this.value)">
-                    </div>
-                </div>
-            </div>
-
-            <div class="card" style="padding: 0; overflow: hidden;">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background: var(--bg-hover); text-align: left;">
-                            <th style="padding: 1rem;">Public ID</th>
-                            <th style="padding: 1rem;">Экзамен / Предмет</th>
-                            <th style="padding: 1rem;">№ КИМ</th>
-                            <th style="padding: 1rem;">Подтема</th>
-                            <th style="padding: 1rem;">Банк</th>
-                            <th style="padding: 1rem;">Ответ</th>
-                            <th style="padding: 1rem;">Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${filteredTasks.map(t => `
-                            <tr style="border-top: 1px solid var(--border-color);">
-                                <td style="padding: 1rem;"><code>${t.publicId}</code></td>
-                                <td style="padding: 1rem;"><strong>${t.examType}</strong> / ${t.subject}</td>
-                                <td style="padding: 1rem;">Задание №${t.taskNumber}</td>
-                                <td style="padding: 1rem;">${t.subtopic}</td>
-                                <td style="padding: 1rem;"><span class="badge badge-info">${t.taskBank}</span></td>
-                                <td style="padding: 1rem;"><code>${t.correctAnswer || '—'}</code></td>
-                                <td style="padding: 1rem;">
-                                    <button id="btn-expand-task-${t.id}" onclick="toggleTaskInspector(${t.id})" class="btn btn-secondary btn-sm" style="margin-right:4px;">👁️ Развернуть</button>
-                                    <button onclick="renderEditTaskModal(${t.id})" class="btn btn-secondary btn-sm">✏️ Изменить</button>
-                                    <button onclick="deleteTask(${t.id})" class="btn btn-danger btn-sm" style="margin-left:4px;">Удалить</button>
-                                </td>
-                            </tr>
-                            <tr id="task-detail-row-${t.id}" style="display: none; background: var(--bg-hover);">
-                                <td colspan="7" style="padding: 1.2rem;">
-                                    <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary);">Полный текст задачи (${t.publicId}):</div>
-                                    <div class="task-content" style="padding: 1rem; background: var(--bg-card); border-radius: 0.5rem; border: 1px solid var(--border-color); margin-bottom: 1rem;">
-                                        ${t.content || ''}
-                                    </div>
-                                    ${t.images && t.images.length ? `
-                                        <div class="task-image-grid" style="margin-bottom: 1rem;">
-                                            ${t.images.map((img, i) => `
-                                                <div class="task-image-item">
-                                                    ${t.images.length > 1 ? `<span class="image-option-badge">${i + 1})</span>` : ''}
-                                                    <img src="${img.url}" style="max-width: 260px; border-radius: 0.5rem; border: 1px solid var(--border-color);">
-                                                </div>
-                                            `).join('')}
-                                        </div>
-                                    ` : ''}
-                                    <div style="font-size: 0.9rem;">
-                                        <strong>Правильный ответ:</strong> <code style="color: var(--success); font-size: 1rem;">${t.correctAnswer || '—'}</code>
-                                    </div>
-                                </td>
-                            </tr>
-                        `).join('') || '<tr><td colspan="7" style="padding: 2rem; text-align: center;">Задачи по выбранным фильтрам не найдены</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-        `;
-        triggerKaTeX();
-    } catch (err) {
-        container.innerHTML = `<div class="badge badge-danger">Ошибка: ${err.message}</div>`;
+            state.adminTasks = tasks;
+            if (subjects.length) state.dictionaries.subjects = subjects;
+            if (exams.length) state.dictionaries.exams = exams;
+            if (banks.length) state.dictionaries.banks = banks;
+        } catch (err) {
+            container.innerHTML = `<div class="badge badge-danger">Ошибка загрузки: ${err.message}</div>`;
+            return;
+        }
     }
+
+    const tasks = state.adminTasks || [];
+    const f = state.taskFilters;
+    if (!f.pageSize) f.pageSize = 20;
+    if (!f.currentPage) f.currentPage = 1;
+
+    // Фильтрация
+    const filteredTasks = tasks.filter(t => {
+        if (f.search && !t.publicId.toLowerCase().includes(f.search.toLowerCase())) return false;
+        if (f.subject && t.subject !== f.subject) return false;
+        if (f.exam && t.examType !== f.exam) return false;
+        if (f.bank && t.taskBank !== f.bank) return false;
+        if (f.subtopic && (!t.subtopic || !t.subtopic.toLowerCase().includes(f.subtopic.toLowerCase()))) return false;
+        if (f.taskNumber && String(t.taskNumber || '').trim() !== String(f.taskNumber).trim()) return false;
+        return true;
+    });
+
+    // Пагинация (ограничение до 50 задач на страницу max)
+    const pageSize = Math.min(parseInt(f.pageSize) || 20, 50);
+    const totalPages = Math.ceil(filteredTasks.length / pageSize) || 1;
+    if (f.currentPage > totalPages) f.currentPage = totalPages;
+    if (f.currentPage < 1) f.currentPage = 1;
+
+    const startIndex = (f.currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, filteredTasks.length);
+    const paginatedTasks = filteredTasks.slice(startIndex, endIndex);
+
+    container.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+            <h2 style="font-size: 1.4rem; font-weight: 700;">Банк Задач (${filteredTasks.length} из ${tasks.length})</h2>
+            <div style="display: flex; gap: 0.5rem;">
+                <input type="file" id="zip-file-input" accept=".zip" style="display: none;" onchange="uploadZipArchive(this)">
+                <button onclick="document.getElementById('zip-file-input').click()" class="btn btn-secondary">📦 Импорт из ZIP</button>
+                <button onclick="renderCreateTaskModal()" class="btn btn-primary">+ Создать задачу</button>
+            </div>
+        </div>
+
+        <!-- Filters Bar -->
+        <div class="card" style="margin-bottom: 1rem; padding: 1rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.8rem; align-items: end;">
+                <div>
+                    <label class="form-label" style="font-size:0.8rem;">Public ID</label>
+                    <input type="text" id="task-filter-search" class="form-control" placeholder="T-1001..." value="${f.search || ''}" oninput="updateTaskFilterState('search', this.value)">
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:0.8rem;">№ Задания КИМ</label>
+                    <input type="number" id="task-filter-number" class="form-control" placeholder="1, 2, 3..." value="${f.taskNumber || ''}" oninput="updateTaskFilterState('taskNumber', this.value)">
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:0.8rem;">Предмет</label>
+                    <select id="task-filter-subject" class="form-control" onchange="updateTaskFilterState('subject', this.value)">
+                        <option value="">Все предметы</option>
+                        ${state.dictionaries.subjects.map(s => `<option value="${s.name}" ${f.subject === s.name ? 'selected' : ''}>${s.displayName}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:0.8rem;">Экзамен</label>
+                    <select id="task-filter-exam" class="form-control" onchange="updateTaskFilterState('exam', this.value)">
+                        <option value="">Все экзамены</option>
+                        ${state.dictionaries.exams.map(e => `<option value="${e.name}" ${f.exam === e.name ? 'selected' : ''}>${e.displayName}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:0.8rem;">Банк</label>
+                    <select id="task-filter-bank" class="form-control" onchange="updateTaskFilterState('bank', this.value)">
+                        <option value="">Все банки</option>
+                        ${state.dictionaries.banks.map(b => `<option value="${b.name}" ${f.bank === b.name ? 'selected' : ''}>${b.displayName}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:0.8rem;">Подтема</label>
+                    <input type="text" id="task-filter-subtopic" class="form-control" placeholder="Подтема..." value="${f.subtopic || ''}" oninput="updateTaskFilterState('subtopic', this.value)">
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:0.8rem; font-weight: 700; color: var(--accent-color);">Показывать по</label>
+                    <select id="task-filter-size" class="form-control" style="font-weight: 600;" onchange="updateTaskFilterState('pageSize', parseInt(this.value))">
+                        <option value="10" ${pageSize === 10 ? 'selected' : ''}>10 задач</option>
+                        <option value="20" ${pageSize === 20 ? 'selected' : ''}>20 задач</option>
+                        <option value="30" ${pageSize === 30 ? 'selected' : ''}>30 задач</option>
+                        <option value="40" ${pageSize === 40 ? 'selected' : ''}>40 задач</option>
+                        <option value="50" ${pageSize === 50 ? 'selected' : ''}>50 задач (макс)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="padding: 0; overflow: hidden; margin-bottom: 1rem;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: var(--bg-hover); text-align: left;">
+                        <th style="padding: 1rem;">Public ID</th>
+                        <th style="padding: 1rem;">Экзамен / Предмет</th>
+                        <th style="padding: 1rem;">№ КИМ</th>
+                        <th style="padding: 1rem;">Подтема</th>
+                        <th style="padding: 1rem;">Банк</th>
+                        <th style="padding: 1rem;">Ответ</th>
+                        <th style="padding: 1rem;">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${paginatedTasks.map(t => `
+                        <tr style="border-top: 1px solid var(--border-color);">
+                            <td style="padding: 1rem;"><code>${t.publicId}</code></td>
+                            <td style="padding: 1rem;"><strong>${t.examType}</strong> / ${t.subject}</td>
+                            <td style="padding: 1rem;"><span class="badge badge-warning">Задание №${t.taskNumber || '—'}</span></td>
+                            <td style="padding: 1rem;">${t.subtopic || '—'}</td>
+                            <td style="padding: 1rem;"><span class="badge badge-info">${t.taskBank}</span></td>
+                            <td style="padding: 1rem;"><code>${t.correctAnswer || '—'}</code></td>
+                            <td style="padding: 1rem;">
+                                <button id="btn-expand-task-${t.id}" onclick="toggleTaskInspector(${t.id})" class="btn btn-secondary btn-sm" style="margin-right:4px;">👁️ Развернуть</button>
+                                <button onclick="renderEditTaskModal(${t.id})" class="btn btn-secondary btn-sm">✏️ Изменить</button>
+                                <button onclick="deleteTask(${t.id})" class="btn btn-danger btn-sm" style="margin-left:4px;">Удалить</button>
+                            </td>
+                        </tr>
+                        <tr id="task-detail-row-${t.id}" style="display: none; background: var(--bg-hover);">
+                            <td colspan="7" style="padding: 1.2rem;">
+                                <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary);">Полный текст задачи (${t.publicId}):</div>
+                                <div class="task-content" style="padding: 1rem; background: var(--bg-card); border-radius: 0.5rem; border: 1px solid var(--border-color); margin-bottom: 1rem;">
+                                    ${t.content || ''}
+                                </div>
+                                ${t.images && t.images.length ? `
+                                    <div class="task-image-grid" style="margin-bottom: 1rem;">
+                                        ${t.images.map((img, i) => `
+                                            <div class="task-image-item">
+                                                ${t.images.length > 1 ? `<span class="image-option-badge">${i + 1})</span>` : ''}
+                                                <img src="${img.url}" style="max-width: 260px; border-radius: 0.5rem; border: 1px solid var(--border-color);">
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                ` : ''}
+                                <div style="font-size: 0.9rem;">
+                                    <strong>Правильный ответ:</strong> <code style="color: var(--success); font-size: 1rem;">${t.correctAnswer || '—'}</code>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="7" style="padding: 2rem; text-align: center; color: var(--text-secondary);">Задачи по выбранным фильтрам не найдены</td></tr>'}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Пагинационная плашка -->
+        <div class="card" style="padding: 0.8rem 1.2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
+            <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                Показано <strong>${filteredTasks.length ? startIndex + 1 : 0}–${endIndex}</strong> из <strong>${filteredTasks.length}</strong> задач
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <button onclick="changeTaskPage(${f.currentPage - 1})" class="btn btn-secondary btn-sm" ${f.currentPage <= 1 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>« Назад</button>
+                <span style="font-size: 0.9rem; font-weight: 600; padding: 0 0.5rem;">Страница ${f.currentPage} из ${totalPages}</span>
+                <button onclick="changeTaskPage(${f.currentPage + 1})" class="btn btn-secondary btn-sm" ${f.currentPage >= totalPages ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>Вперед »</button>
+            </div>
+        </div>
+    `;
+    triggerKaTeX();
+}
+
+function changeTaskPage(page) {
+    state.taskFilters.currentPage = page;
+    loadAdminTasksTab(document.getElementById('admin-tab-content'));
 }
 
 function toggleTaskInspector(id) {
@@ -926,7 +1046,8 @@ function toggleTaskInspector(id) {
 
 function updateTaskFilterState(key, val) {
     state.taskFilters[key] = val;
-    loadAdminTabContent();
+    state.taskFilters.currentPage = 1; // Сброс на 1 страницу при изменении любого фильтра
+    loadAdminTasksTab(document.getElementById('admin-tab-content'));
 }
 
 function renderEditTaskModal(id) {

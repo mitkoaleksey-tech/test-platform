@@ -964,6 +964,150 @@ def get_math_fipi_for_export(df_tasks: pd.DataFrame) -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 
+def solve_fipi_math_task(q_raw: str) -> str:
+    """
+    Математический Python-солвер для типовых задач ФИПИ I части (проценты, пропорции,
+    физические формулы, теория вероятностей, показательные и квадратные уравнения).
+    """
+    if not isinstance(q_raw, str) or not q_raw.strip():
+        return ""
+
+    c = re.sub(r'<[^>]+>', '', q_raw)
+    c = re.sub(r'\[\s*рис\.?\s*\d*\s*\]', '', c, flags=re.IGNORECASE)
+    c = re.sub(r'\s+', ' ', c).strip()
+
+    # 1.1 Автобусы / Экскурсии (округление вверх)
+    m = re.search(r'(\d+)\s*детей\s*и\s*(\d+)\s*воспитател.*?не\s*более\s*(\d+)', c, re.IGNORECASE)
+    if m:
+        n1, n2, n3 = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        return str(math.ceil((n1 + n2) / n3))
+
+    # 1.2 Снижение цены в процентах (телефон, товар)
+    m = re.search(r'стоил[а-о]?\s*(\d+(?:[.,]\d+)?)\s*рубл.*?стал[а-о]?\s*стоить\s*(\d+(?:[.,]\d+)?)\s*рубл.*?процент', c, re.IGNORECASE)
+    if m:
+        n1 = float(m.group(1).replace(',', '.'))
+        n2 = float(m.group(2).replace(',', '.'))
+        if n1 > 0:
+            pct = (n1 - n2) / n1 * 100.0
+            return str(int(round(pct))) if abs(pct - round(pct)) < 1e-5 else str(round(pct, 2)).replace('.', ',')
+
+    # 1.3 Повышение цены в процентах
+    m = re.search(r'стоил[а-о]?\s*(\d+(?:[.,]\d+)?)\s*рубл.*?повысил.*?на\s*(\d+(?:[.,]\d+)?)\s*процент', c, re.IGNORECASE)
+    if m:
+        n1 = float(m.group(1).replace(',', '.'))
+        pct = float(m.group(2).replace(',', '.'))
+        res = n1 * (1.0 + pct / 100.0)
+        return str(int(round(res))) if abs(res - round(res)) < 1e-5 else str(round(res, 2)).replace('.', ',')
+
+    # 1.4 Отношение ингредиентов (фарш, смесь)
+    m = re.search(r'отношении\s*(\d+)\s*:\s*(\d+).*?процент.*?составляет\s*(\w+)', c, re.IGNORECASE)
+    if m:
+        n1, n2 = float(m.group(1)), float(m.group(2))
+        res = n2 / (n1 + n2) * 100.0
+        return str(int(round(res))) if abs(res - round(res)) < 1e-5 else str(round(res, 2)).replace('.', ',')
+
+    # 1.5 Сахар в лагере на человека
+    m = re.search(r'(\d+)\s*г\s*сахара.*?(\d+)\s*человек.*?упаковок', c, re.IGNORECASE)
+    if m:
+        g_per_p = float(m.group(1))
+        people = float(m.group(2))
+        total_kg = (g_per_p * people) / 1000.0
+        return str(math.ceil(total_kg))
+
+    # 2.1 P = I^2 * R  -> R = P / I^2
+    m = re.search(r'P\s*=\s*I\^?2\s*R.*?P\s*=\s*(\d+(?:[.,]\d+)?).*?I\s*=\s*(\d+(?:[.,]\d+)?)', c, re.IGNORECASE)
+    if not m:
+        m = re.search(r'мощность.*?P\s*=\s*(\d+(?:[.,]\d+)?).*?сила тока.*?I\s*=\s*(\d+(?:[.,]\d+)?)', c, re.IGNORECASE)
+    if m:
+        p_val = float(m.group(1).replace(',', '.'))
+        i_val = float(m.group(2).replace(',', '.'))
+        if i_val > 0:
+            r_val = p_val / (i_val ** 2)
+            return str(int(round(r_val))) if abs(r_val - round(r_val)) < 1e-5 else str(round(r_val, 2)).replace('.', ',')
+
+    # 2.2 Закон Гука F = kx -> x = F / k
+    m = re.search(r'F\s*=\s*kx.*?F\s*=\s*(\d+(?:[.,]\d+)?).*?k\s*=\s*(\d+(?:[.,]\d+)?)', c, re.IGNORECASE)
+    if m:
+        f_val = float(m.group(1).replace(',', '.'))
+        k_val = float(m.group(2).replace(',', '.'))
+        if k_val > 0:
+            x_val = f_val / k_val
+            return str(int(round(x_val))) if abs(x_val - round(x_val)) < 1e-5 else str(round(x_val, 2)).replace('.', ',')
+
+    # 2.3 Высота перил / трапеция средняя линия l = (h1 + h2) / 2
+    m = re.search(r'наименьшая\s*высота.*?(\d+(?:[.,]\d+)?).*?наибольшая\s*высота.*?(\d+(?:[.,]\d+)?)', c, re.IGNORECASE)
+    if m:
+        h1 = float(m.group(1).replace(',', '.'))
+        h2 = float(m.group(2).replace(',', '.'))
+        l_val = (h1 + h2) / 2.0
+        return str(int(round(l_val))) if abs(l_val - round(l_val)) < 1e-5 else str(round(l_val, 2)).replace('.', ',')
+
+    # 3.1 Жребий (N имен)
+    m = re.search(r'((?:[А-Я][а-я]+,\s*)+[А-Я][а-я]+\s*и\s*[А-Я][а-я]+)\s*бросили\s*жребий', c)
+    if m:
+        names = re.findall(r'[А-Я][а-я]+', m.group(1))
+        if names:
+            prob = 1.0 / len(names)
+            return str(round(prob, 2)).replace('.', ',')
+
+    # 3.2 Билеты (выигрышные / всего)
+    m = re.search(r'всего\s*(\d+)\s*билет.*?(\d+)\s*из\s*них\s*выигрышн', c, re.IGNORECASE)
+    if m:
+        total_b = float(m.group(1))
+        win_b = float(m.group(2))
+        if total_b > 0:
+            prob = win_b / total_b
+            return str(round(prob, 2)).replace('.', ',')
+
+    # 3.3 Такси (черные / всего)
+    m = re.search(r'всего\s*(\d+)\s*такси.*?(\d+)\s*черн', c, re.IGNORECASE)
+    if m:
+        total_t = float(m.group(1))
+        black_t = float(m.group(2))
+        if total_t > 0:
+            prob = black_t / total_t
+            return str(round(prob, 2)).replace('.', ',')
+
+    # 4.1 Показательное уравнение вида (a/b)^(x-c) = (d1/d2) или a^(x-c) = d
+    m = re.search(r'\(\s*\\frac\{(\d+)\}\{(\d+)\}\s*\)\s*\^\{\s*x\s*([-+]\s*\d+)\s*\}\s*=\s*\\frac\{(\d+)\}\{(\d+)\}', c)
+    if m:
+        a, b = float(m.group(1)), float(m.group(2))
+        c_val = float(m.group(3).replace(' ', ''))
+        d1, d2 = float(m.group(4)), float(m.group(5))
+        base = a / b
+        target = d1 / d2
+        if base > 0 and target > 0 and base != 1:
+            power = math.log(target) / math.log(base)
+            x_sol = power - c_val
+            return str(int(round(x_sol))) if abs(x_sol - round(x_sol)) < 1e-5 else str(round(x_sol, 2)).replace('.', ',')
+
+    # 4.2 Простые показательные уравнения a^(x-c) = b
+    m = re.search(r'(\d+)\s*\^\{\s*x\s*([-+]\s*\d+)\s*\}\s*=\s*(\d+)', c)
+    if m:
+        base = float(m.group(1))
+        c_val = float(m.group(2).replace(' ', ''))
+        target = float(m.group(3))
+        if base > 0 and target > 0 and base != 1:
+            power = math.log(target) / math.log(base)
+            x_sol = power - c_val
+            return str(int(round(x_sol))) if abs(x_sol - round(x_sol)) < 1e-5 else str(round(x_sol, 2)).replace('.', ',')
+
+    # 4.3 Квадратные уравнения ax^2 + bx + c = 0
+    m = re.search(r'(\d+)\s*x\s*\^\s*2\s*([-+]\s*\d+)\s*x\s*([-+]\s*\d+)\s*=\s*0', c)
+    if m:
+        a = float(m.group(1))
+        b = float(m.group(2).replace(' ', ''))
+        c_v = float(m.group(3).replace(' ', ''))
+        disc = b**2 - 4*a*c_v
+        if disc >= 0:
+            x1 = (-b + math.sqrt(disc)) / (2*a)
+            x2 = (-b - math.sqrt(disc)) / (2*a)
+            res = min(x1, x2) if 'меньший' in c.lower() else max(x1, x2)
+            return str(int(round(res))) if abs(res - round(res)) < 1e-5 else str(round(res, 2)).replace('.', ',')
+
+    return ""
+
+
 def export_math_fipi_to_review_excel(
     df_tasks: pd.DataFrame,
     output_path: Path,
@@ -1121,150 +1265,6 @@ def export_math_fipi_to_review_excel(
     df["correct_answer"] = answers
     recovered_count = sum(1 for a in answers if a)
     print(f"[MathExport] Восстановлено/вычислено правильных ответов для I части ФИПИ: {recovered_count:,} из {len(df):,}", flush=True)
-
-
-def solve_fipi_math_task(q_raw: str) -> str:
-    """
-    Математический Python-солвер для типовых задач ФИПИ I части (проценты, пропорции,
-    физические формулы, теория вероятностей, показательные и квадратные уравнения).
-    """
-    if not isinstance(q_raw, str) or not q_raw.strip():
-        return ""
-
-    c = re.sub(r'<[^>]+>', '', q_raw)
-    c = re.sub(r'\[\s*рис\.?\s*\d*\s*\]', '', c, flags=re.IGNORECASE)
-    c = re.sub(r'\s+', ' ', c).strip()
-
-    # 1.1 Автобусы / Экскурсии (округление вверх)
-    m = re.search(r'(\d+)\s*детей\s*и\s*(\d+)\s*воспитател.*?не\s*более\s*(\d+)', c, re.IGNORECASE)
-    if m:
-        n1, n2, n3 = int(m.group(1)), int(m.group(2)), int(m.group(3))
-        return str(math.ceil((n1 + n2) / n3))
-
-    # 1.2 Снижение цены в процентах (телефон, товар)
-    m = re.search(r'стоил[а-о]?\s*(\d+(?:[.,]\d+)?)\s*рубл.*?стал[а-о]?\s*стоить\s*(\d+(?:[.,]\d+)?)\s*рубл.*?процент', c, re.IGNORECASE)
-    if m:
-        n1 = float(m.group(1).replace(',', '.'))
-        n2 = float(m.group(2).replace(',', '.'))
-        if n1 > 0:
-            pct = (n1 - n2) / n1 * 100.0
-            return str(int(round(pct))) if abs(pct - round(pct)) < 1e-5 else str(round(pct, 2)).replace('.', ',')
-
-    # 1.3 Повышение цены в процентах
-    m = re.search(r'стоил[а-о]?\s*(\d+(?:[.,]\d+)?)\s*рубл.*?повысил.*?на\s*(\d+(?:[.,]\d+)?)\s*процент', c, re.IGNORECASE)
-    if m:
-        n1 = float(m.group(1).replace(',', '.'))
-        pct = float(m.group(2).replace(',', '.'))
-        res = n1 * (1.0 + pct / 100.0)
-        return str(int(round(res))) if abs(res - round(res)) < 1e-5 else str(round(res, 2)).replace('.', ',')
-
-    # 1.4 Отношение ингредиентов (фарш, смесь)
-    m = re.search(r'отношении\s*(\d+)\s*:\s*(\d+).*?процент.*?составляет\s*(\w+)', c, re.IGNORECASE)
-    if m:
-        n1, n2 = float(m.group(1)), float(m.group(2))
-        res = n2 / (n1 + n2) * 100.0
-        return str(int(round(res))) if abs(res - round(res)) < 1e-5 else str(round(res, 2)).replace('.', ',')
-
-    # 1.5 Сахар в лагере на человека
-    m = re.search(r'(\d+)\s*г\s*сахара.*?(\d+)\s*человек.*?упаковок', c, re.IGNORECASE)
-    if m:
-        g_per_p = float(m.group(1))
-        people = float(m.group(2))
-        total_kg = (g_per_p * people) / 1000.0
-        return str(math.ceil(total_kg))
-
-    # 2.1 P = I^2 * R  -> R = P / I^2
-    m = re.search(r'P\s*=\s*I\^?2\s*R.*?P\s*=\s*(\d+(?:[.,]\d+)?).*?I\s*=\s*(\d+(?:[.,]\d+)?)', c, re.IGNORECASE)
-    if not m:
-        m = re.search(r'мощность.*?P\s*=\s*(\d+(?:[.,]\d+)?).*?сила тока.*?I\s*=\s*(\d+(?:[.,]\d+)?)', c, re.IGNORECASE)
-    if m:
-        p_val = float(m.group(1).replace(',', '.'))
-        i_val = float(m.group(2).replace(',', '.'))
-        if i_val > 0:
-            r_val = p_val / (i_val ** 2)
-            return str(int(round(r_val))) if abs(r_val - round(r_val)) < 1e-5 else str(round(r_val, 2)).replace('.', ',')
-
-    # 2.2 Закон Гука F = kx -> x = F / k
-    m = re.search(r'F\s*=\s*kx.*?F\s*=\s*(\d+(?:[.,]\d+)?).*?k\s*=\s*(\d+(?:[.,]\d+)?)', c, re.IGNORECASE)
-    if m:
-        f_val = float(m.group(1).replace(',', '.'))
-        k_val = float(m.group(2).replace(',', '.'))
-        if k_val > 0:
-            x_val = f_val / k_val
-            return str(int(round(x_val))) if abs(x_val - round(x_val)) < 1e-5 else str(round(x_val, 2)).replace('.', ',')
-
-    # 2.3 Высота перил / трапеция средняя линия l = (h1 + h2) / 2
-    m = re.search(r'наименьшая\s*высота.*?(\d+(?:[.,]\d+)?).*?наибольшая\s*высота.*?(\d+(?:[.,]\d+)?)', c, re.IGNORECASE)
-    if m:
-        h1 = float(m.group(1).replace(',', '.'))
-        h2 = float(m.group(2).replace(',', '.'))
-        l_val = (h1 + h2) / 2.0
-        return str(int(round(l_val))) if abs(l_val - round(l_val)) < 1e-5 else str(round(l_val, 2)).replace('.', ',')
-
-    # 3.1 Жребий (N имен)
-    m = re.search(r'((?:[А-Я][а-я]+,\s*)+[А-Я][а-я]+\s*и\s*[А-Я][а-я]+)\s*бросили\s*жребий', c)
-    if m:
-        names = re.findall(r'[А-Я][а-я]+', m.group(1))
-        if names:
-            prob = 1.0 / len(names)
-            return str(round(prob, 2)).replace('.', ',')
-
-    # 3.2 Билеты (выигрышные / всего)
-    m = re.search(r'всего\s*(\d+)\s*билет.*?(\d+)\s*из\s*них\s*выигрышн', c, re.IGNORECASE)
-    if m:
-        total_b = float(m.group(1))
-        win_b = float(m.group(2))
-        if total_b > 0:
-            prob = win_b / total_b
-            return str(round(prob, 2)).replace('.', ',')
-
-    # 3.3 Такси (черные / всего)
-    m = re.search(r'всего\s*(\d+)\s*такси.*?(\d+)\s*черн', c, re.IGNORECASE)
-    if m:
-        total_t = float(m.group(1))
-        black_t = float(m.group(2))
-        if total_t > 0:
-            prob = black_t / total_t
-            return str(round(prob, 2)).replace('.', ',')
-
-    # 4.1 Показательное уравнение вида (a/b)^(x-c) = (d1/d2) или a^(x-c) = d
-    m = re.search(r'\(\s*\\frac\{(\d+)\}\{(\d+)\}\s*\)\s*\^\{\s*x\s*([-+]\s*\d+)\s*\}\s*=\s*\\frac\{(\d+)\}\{(\d+)\}', c)
-    if m:
-        a, b = float(m.group(1)), float(m.group(2))
-        c_val = float(m.group(3).replace(' ', ''))
-        d1, d2 = float(m.group(4)), float(m.group(5))
-        base = a / b
-        target = d1 / d2
-        if base > 0 and target > 0 and base != 1:
-            power = math.log(target) / math.log(base)
-            x_sol = power - c_val
-            return str(int(round(x_sol))) if abs(x_sol - round(x_sol)) < 1e-5 else str(round(x_sol, 2)).replace('.', ',')
-
-    # 4.2 Простые показательные уравнения a^(x-c) = b
-    m = re.search(r'(\d+)\s*\^\{\s*x\s*([-+]\s*\d+)\s*\}\s*=\s*(\d+)', c)
-    if m:
-        base = float(m.group(1))
-        c_val = float(m.group(2).replace(' ', ''))
-        target = float(m.group(3))
-        if base > 0 and target > 0 and base != 1:
-            power = math.log(target) / math.log(base)
-            x_sol = power - c_val
-            return str(int(round(x_sol))) if abs(x_sol - round(x_sol)) < 1e-5 else str(round(x_sol, 2)).replace('.', ',')
-
-    # 4.3 Квадратные уравнения ax^2 + bx + c = 0
-    m = re.search(r'(\d+)\s*x\s*\^\s*2\s*([-+]\s*\d+)\s*x\s*([-+]\s*\d+)\s*=\s*0', c)
-    if m:
-        a = float(m.group(1))
-        b = float(m.group(2).replace(' ', ''))
-        c_v = float(m.group(3).replace(' ', ''))
-        disc = b**2 - 4*a*c_v
-        if disc >= 0:
-            x1 = (-b + math.sqrt(disc)) / (2*a)
-            x2 = (-b - math.sqrt(disc)) / (2*a)
-            res = min(x1, x2) if 'меньший' in c.lower() else max(x1, x2)
-            return str(int(round(res))) if abs(res - round(res)) < 1e-5 else str(round(res, 2)).replace('.', ',')
-
-    return ""
 
     # Итоговый срез строго из 9 колонок
     export_df = df[MATH_EXCEL_COLUMNS].copy()
