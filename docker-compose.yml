@@ -1,0 +1,46 @@
+services:
+  # PostgreSQL Database Container
+  postgres:
+    image: postgres:16-alpine
+    container_name: test-platform-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: test_platform
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d test_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Spring Boot Web Application Container
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: test-platform-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/test_platform
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgrespassword
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - APP_STORAGE_IMAGES_PATH=./storage/images
+      - APP_SECURITY_JWT_SECRET=change-me-use-at-least-32-characters-secret-key-for-prod
+    volumes:
+      - ./storage:/app/storage
+
+volumes:
+  postgres_data:
