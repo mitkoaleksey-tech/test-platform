@@ -880,31 +880,9 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
             ]);
 
             state.adminTasks = tasks;
-            state.dictionaries.subjects = (subjects && subjects.length) ? subjects : [
-                { name: 'MATHEMATICS', displayName: 'Математика (ОГЭ)' },
-                { name: 'MATHEMATICS_BASE', displayName: 'Математика (Базовый уровень)' },
-                { name: 'MATHEMATICS_PROF', displayName: 'Математика (Профильный уровень)' },
-                { name: 'RUSSIAN', displayName: 'Русский язык' },
-                { name: 'PHYSICS', displayName: 'Физика' },
-                { name: 'INFORMATICS', displayName: 'Информатика' },
-                { name: 'SOCIAL_STUDIES', displayName: 'Обществознание' },
-                { name: 'HISTORY', displayName: 'История' },
-                { name: 'BIOLOGY', displayName: 'Биология' },
-                { name: 'CHEMISTRY', displayName: 'Химия' },
-                { name: 'GEOGRAPHY', displayName: 'География' },
-                { name: 'LITERATURE', displayName: 'Литература' },
-                { name: 'ENGLISH', displayName: 'Английский язык' }
-            ];
-
-            state.dictionaries.exams = (exams && exams.length) ? exams : [
-                { name: 'EGE', displayName: 'ЕГЭ' },
-                { name: 'OGE', displayName: 'ОГЭ' }
-            ];
-
-            state.dictionaries.banks = (banks && banks.length) ? banks : [
-                { name: 'FIPI', displayName: 'ФИПИ' },
-                { name: 'STATGRAD', displayName: 'СтатГрад' }
-            ];
+            if (subjects && subjects.length) state.dictionaries.subjects = subjects;
+            if (exams && exams.length) state.dictionaries.exams = exams;
+            if (banks && banks.length) state.dictionaries.banks = banks;
         } catch (err) {
             container.innerHTML = `<div class="badge badge-danger">Ошибка загрузки: ${err.message}</div>`;
             return;
