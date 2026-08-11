@@ -31,6 +31,15 @@ public class TaskResponse {
     private final LocalDateTime updatedAt;
 
     public static TaskResponse from(Task task, StorageProperties storageProperties) {
+        List<TaskImageResponse> imageResponses = List.of();
+        try {
+            if (task.getImages() != null && org.hibernate.Hibernate.isInitialized(task.getImages())) {
+                imageResponses = task.getImages().stream()
+                        .map(image -> TaskImageResponse.from(image, storageProperties))
+                        .toList();
+            }
+        } catch (Exception ignored) {}
+
         return TaskResponse.builder()
                 .id(task.getId())
                 .publicId(task.getPublicId())
@@ -42,9 +51,7 @@ public class TaskResponse {
                 .content(task.getContent())
                 .correctAnswer(task.getCorrectAnswer())
                 .active(task.isActive())
-                .images(task.getImages().stream()
-                        .map(image -> TaskImageResponse.from(image, storageProperties))
-                        .toList())
+                .images(imageResponses)
                 .createdAt(task.getCreatedAt())
                 .updatedAt(task.getUpdatedAt())
                 .build();
