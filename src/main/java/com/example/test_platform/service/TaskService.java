@@ -117,7 +117,7 @@ public class TaskService {
                 .filter(task -> subject == null || task.getSubject() == subject)
                 .filter(task -> examType == null || task.getExamType() == examType)
                 .filter(task -> taskBank == null || task.getTaskBank() == taskBank)
-                .filter(task -> taskNumber == null || task.getTaskNumber().equals(taskNumber))
+                .filter(task -> taskNumber == null || (task.getTaskNumber() != null && task.getTaskNumber().equals(taskNumber)))
                 .filter(task -> active == null || task.isActive() == active)
                 .toList();
     }

@@ -968,7 +968,7 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
                         <option value="20" ${pageSize === 20 ? 'selected' : ''}>20 задач</option>
                         <option value="30" ${pageSize === 30 ? 'selected' : ''}>30 задач</option>
                         <option value="40" ${pageSize === 40 ? 'selected' : ''}>40 задач</option>
-                        <option value="50" ${pageSize === 50 ? 'selected' : ''}>50 задач (макс)</option>
+                        <option value="50" ${pageSize === 50 ? 'selected' : ''}>50 задач</option>
                     </select>
                 </div>
             </div>
