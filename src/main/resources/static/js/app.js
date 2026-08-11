@@ -466,16 +466,16 @@ function switchAdminTab(tab, evt) {
 }
 
 
-async function loadAdminTabContent() {
+async function loadAdminTabContent(forceRefresh = false) {
     const container = document.getElementById('admin-tab-content');
     if (state.adminTab === 'teachers') {
-        await loadAdminTeachersTab(container);
+        await loadAdminTeachersTab(container, forceRefresh);
     } else if (state.adminTab === 'tasks') {
-        await loadAdminTasksTab(container);
+        await loadAdminTasksTab(container, forceRefresh);
     } else if (state.adminTab === 'dictionaries') {
-        await loadAdminDictionariesTab(container);
+        await loadAdminDictionariesTab(container, forceRefresh);
     } else if (state.adminTab === 'monitoring') {
-        await loadAdminMonitoringTab(container);
+        await loadAdminMonitoringTab(container, forceRefresh);
     }
 }
 
@@ -762,9 +762,9 @@ async function uploadZipArchive(inputElement) {
     // Отрисовка модального окна с процентами прогресса импорта
     const progressModalHtml = `
         <div id="zip-progress-modal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 1.5rem;">
-            <div class="card" style="width: 100%; max-width: 480px; text-align: center; padding: 2rem;">
-                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📦</div>
-                <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">Импорт архива задач</h3>
+            <div class="card" style="width: 100%; max-width: 500px; text-align: center; padding: 2rem;">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;" id="zip-icon">📦</div>
+                <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;" id="zip-modal-title">Импорт архива задач</h3>
                 <p id="zip-progress-status" style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
                     Подготовка файла ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} МБ)...
                 </p>
@@ -793,20 +793,43 @@ async function uploadZipArchive(inputElement) {
     const progressPercent = document.getElementById('zip-progress-percent');
     const progressBytes = document.getElementById('zip-progress-bytes');
     const progressStatus = document.getElementById('zip-progress-status');
+    const modalTitle = document.getElementById('zip-modal-title');
+    const zipIcon = document.getElementById('zip-icon');
 
     xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
             const pct = Math.round((e.loaded / e.total) * 100);
-            if (progressBar) progressBar.style.width = pct + '%';
-            if (progressPercent) progressPercent.innerText = pct + '%';
-            if (progressBytes) progressBytes.innerText = `${(e.loaded / (1024 * 1024)).toFixed(1)} / ${(e.total / (1024 * 1024)).toFixed(1)} МБ`;
-            if (progressStatus) progressStatus.innerText = pct < 100 ? `Загрузка файла архива на сервер (${pct}%)...` : 'Обработка Excel и сохранение задач в СУБД...';
+            if (pct < 100) {
+                if (progressBar) progressBar.style.width = pct + '%';
+                if (progressPercent) progressPercent.innerText = pct + '%';
+                if (progressBytes) progressBytes.innerText = `${(e.loaded / (1024 * 1024)).toFixed(1)} / ${(e.total / (1024 * 1024)).toFixed(1)} МБ`;
+                if (progressStatus) progressStatus.innerText = `Передача архива ${file.name} на сервер (${pct}%)...`;
+            } else {
+                if (progressBar) {
+                    progressBar.style.width = '100%';
+                    progressBar.style.background = 'linear-gradient(90deg, #10b981, #6366f1)';
+                }
+                if (progressPercent) progressPercent.innerText = '100%';
+                if (progressBytes) progressBytes.innerText = 'Пакетная запись в СУБД...';
+                if (modalTitle) modalTitle.innerText = 'Обработка задач в PostgreSQL';
+                if (zipIcon) zipIcon.innerText = '⚙️';
+                if (progressStatus) {
+                    progressStatus.innerHTML = `
+                        <strong style="color: var(--success);">Файл передан на сервер!</strong><br>
+                        Выполняется распаковка ZIP, парсинг Excel и запись 11,000 задач в PostgreSQL.<br>
+                        <small style="color: var(--text-secondary);">Пожалуйста, подождите несколько секунд (не закрывайте окно)...</small>
+                    `;
+                }
+            }
         }
     };
 
     xhr.onload = () => {
         const modal = document.getElementById('zip-progress-modal');
         if (modal) modal.remove();
+
+        // Сбрасываем локальный кэш задач для загрузки свежих из БД
+        state.adminTasks = null;
 
         if (xhr.status >= 200 && xhr.status < 300) {
             try {

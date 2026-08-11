@@ -215,14 +215,14 @@ public class ZipImportService {
                     }
 
                     batchList.add(task);
-                    if (batchList.size() >= 1000) {
-                        taskRepository.saveAll(batchList);
+                    if (batchList.size() >= 500) {
+                        taskRepository.saveAllAndFlush(batchList);
                         batchList.clear();
                     }
                 }
 
                 if (!batchList.isEmpty()) {
-                    taskRepository.saveAll(batchList);
+                    taskRepository.saveAllAndFlush(batchList);
                     batchList.clear();
                 }
             }
