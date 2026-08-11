@@ -494,59 +494,56 @@ async function loadAdminTeachersTab(container, forceRefresh = false) {
     }
     const teachers = state.adminTeachers || [];
 
-        container.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h2 style="font-size: 1.4rem; font-weight: 700;">Управление Преподавателями (${teachers.length})</h2>
-                <button onclick="renderCreateTeacherModal()" class="btn btn-primary">+ Добавить преподавателя</button>
-            </div>
+    container.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2 style="font-size: 1.4rem; font-weight: 700;">Управление Преподавателями (${teachers.length})</h2>
+            <button onclick="renderCreateTeacherModal()" class="btn btn-primary">+ Добавить преподавателя</button>
+        </div>
 
-            <div class="card" style="padding: 0; overflow: hidden;">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background: var(--bg-hover); text-align: left;">
-                            <th style="padding: 1rem;">ID</th>
-                            <th style="padding: 1rem;">ФИО Преподавателя</th>
-                            <th style="padding: 1rem;">Логин</th>
-                            <th style="padding: 1rem;">Пароль / Статус</th>
-                            <th style="padding: 1rem;">Тестов</th>
-                            <th style="padding: 1rem;">Активна подписка до</th>
-                            <th style="padding: 1rem;">Действия</th>
+        <div class="card" style="padding: 0; overflow: hidden;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: var(--bg-hover); text-align: left;">
+                        <th style="padding: 1rem;">ID</th>
+                        <th style="padding: 1rem;">ФИО Преподавателя</th>
+                        <th style="padding: 1rem;">Логин</th>
+                        <th style="padding: 1rem;">Пароль / Статус</th>
+                        <th style="padding: 1rem;">Тестов</th>
+                        <th style="padding: 1rem;">Активна подписка до</th>
+                        <th style="padding: 1rem;">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${teachers.map(t => {
+                        const nextSubDate = t.nextPaymentAt ? new Date(t.nextPaymentAt).toLocaleDateString('ru-RU') : 'Не ограничена';
+                        return `
+                        <tr id="teacher-row-${t.id}" style="border-top: 1px solid var(--border-color);">
+                            <td style="padding: 1rem;">#${t.id}</td>
+                            <td style="padding: 1rem;"><strong>${t.displayName}</strong></td>
+                            <td style="padding: 1rem;"><code>${t.login}</code></td>
+                            <td style="padding: 1rem;">
+                                ${t.temporaryPassword ? `
+                                    <span class="badge badge-warning">Временный</span>
+                                    <button id="btn-copy-pass-${t.id}" data-pass="${(state.teacherTempPasswords && state.teacherTempPasswords[t.id]) || t.temporaryPasswordStr || ''}" onclick="copyTeacherPassword(${t.id}, event)" class="btn btn-sm btn-secondary" style="margin-left:5px;">📋 Пароль</button>
+                                ` : '<span class="badge badge-success">Постоянный</span>'}
+                            </td>
+                            <td style="padding: 1rem;">${t.testsCreatedCount || t.createdVariantsCount || 0}</td>
+                            <td style="padding: 1rem;">
+                                <span class="badge badge-info">${nextSubDate}</span>
+                                <button onclick="renderUpdateSubscriptionModal(${t.id})" class="btn btn-sm btn-secondary" style="margin-left:5px;" title="Изменить дату подписки">📅</button>
+                            </td>
+                            <td style="padding: 1rem;">
+                                <button onclick="renderEditTeacherModal(${t.id})" class="btn btn-secondary btn-sm" title="Редактировать ФИО и Логин">✏️</button>
+                                <button onclick="copyToClipboard('${t.login}')" class="btn btn-sm btn-secondary" title="Скопировать логин">📋 Логин</button>
+                                <button onclick="resetTeacherPassword(${t.id})" class="btn btn-secondary btn-sm">Сбросить пароль</button>
+                                <button onclick="deleteTeacher(${t.id})" class="btn btn-danger btn-sm">Удалить</button>
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        ${teachers.map(t => {
-                            const nextSubDate = t.nextPaymentAt ? new Date(t.nextPaymentAt).toLocaleDateString('ru-RU') : 'Не ограничена';
-                            return `
-                            <tr id="teacher-row-${t.id}" style="border-top: 1px solid var(--border-color);">
-                                <td style="padding: 1rem;">#${t.id}</td>
-                                <td style="padding: 1rem;"><strong>${t.displayName}</strong></td>
-                                <td style="padding: 1rem;"><code>${t.login}</code></td>
-                                <td style="padding: 1rem;">
-                                    ${t.temporaryPassword ? `
-                                        <span class="badge badge-warning">Временный</span>
-                                        <button id="btn-copy-pass-${t.id}" data-pass="${(state.teacherTempPasswords && state.teacherTempPasswords[t.id]) || t.temporaryPasswordStr || ''}" onclick="copyTeacherPassword(${t.id}, event)" class="btn btn-sm btn-secondary" style="margin-left:5px;">📋 Пароль</button>
-                                    ` : '<span class="badge badge-success">Постоянный</span>'}
-                                </td>
-                                <td style="padding: 1rem;">${t.testsCreatedCount || t.createdVariantsCount || 0}</td>
-                                <td style="padding: 1rem;">
-                                    <span class="badge badge-info">${nextSubDate}</span>
-                                    <button onclick="renderUpdateSubscriptionModal(${t.id})" class="btn btn-sm btn-secondary" style="margin-left:5px;" title="Изменить дату подписки">📅</button>
-                                </td>
-                                <td style="padding: 1rem;">
-                                    <button onclick="renderEditTeacherModal(${t.id})" class="btn btn-secondary btn-sm" title="Редактировать ФИО и Логин">✏️</button>
-                                    <button onclick="copyToClipboard('${t.login}')" class="btn btn-sm btn-secondary" title="Скопировать логин">📋 Логин</button>
-                                    <button onclick="resetTeacherPassword(${t.id})" class="btn btn-secondary btn-sm">Сбросить пароль</button>
-                                    <button onclick="deleteTeacher(${t.id})" class="btn btn-danger btn-sm">Удалить</button>
-                                </td>
-                            </tr>
-                        `}).join('') || '<tr><td colspan="7" style="padding: 2rem; text-align: center;">Преподаватели отсутствуют</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    } catch (err) {
-        container.innerHTML = `<div class="badge badge-danger">Ошибка: ${err.message}</div>`;
-    }
+                    `}).join('') || '<tr><td colspan="7" style="padding: 2rem; text-align: center;">Преподаватели отсутствуют</td></tr>'}
+                </tbody>
+            </table>
+        </div>
+    `;
 }
 
 function renderEditTeacherModal(id) {
