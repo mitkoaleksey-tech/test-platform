@@ -547,6 +547,19 @@ async function loadAdminTeachersTab(container, forceRefresh = false) {
     `;
 }
 
+function copyTeacherPassword(id, evt) {
+    const btn = evt ? (evt.currentTarget || evt.target) : null;
+    let pass = (state.teacherTempPasswords && state.teacherTempPasswords[id]) || '';
+    if (!pass && btn && btn.dataset && btn.dataset.pass) {
+        pass = btn.dataset.pass;
+    }
+    if (pass) {
+        copyToClipboard(pass, btn);
+    } else {
+        showToast('Пароль недоступен для копирования', 'info');
+    }
+}
+
 function renderEditTeacherModal(id) {
     const teacher = (state.adminTeachers || []).find(t => t.id === id);
     if (!teacher) return;
@@ -880,7 +893,7 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
                 apiFetch('/api/admin/dictionaries/banks').catch(() => [])
             ]);
 
-            state.adminTasks = tasks;
+            state.adminTasks = Array.isArray(tasks) ? tasks : (tasks && (tasks.content || tasks.items)) || [];
             if (subjects && subjects.length) state.dictionaries.subjects = subjects;
             if (exams && exams.length) state.dictionaries.exams = exams;
             if (banks && banks.length) state.dictionaries.banks = banks;
@@ -920,6 +933,8 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
             <h2 style="font-size: 1.4rem; font-weight: 700;">Банк Задач (${filteredTasks.length} из ${tasks.length})</h2>
             <div style="display: flex; gap: 0.5rem;">
+                <button onclick="loadAdminTabContent(true)" class="btn btn-secondary" title="Обновить данные из базы">🔄 Обновить</button>
+                <button onclick="resetTaskFilters()" class="btn btn-secondary" title="Сбросить все фильтры">❌ Сбросить фильтры</button>
                 <input type="file" id="zip-file-input" accept=".zip" style="display: none;" onchange="uploadZipArchive(this)">
                 <button onclick="document.getElementById('zip-file-input').click()" class="btn btn-secondary">📦 Импорт из ZIP</button>
                 <button onclick="renderCreateTaskModal()" class="btn btn-primary">+ Создать задачу</button>
@@ -1048,6 +1063,11 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
 function changeTaskPage(page) {
     state.taskFilters.currentPage = page;
     loadAdminTasksTab(document.getElementById('admin-tab-content'));
+}
+
+function resetTaskFilters() {
+    state.taskFilters = { search: '', taskNumber: '', subject: '', exam: '', bank: '', subtopic: '', pageSize: 20, currentPage: 1 };
+    loadAdminTabContent(true);
 }
 
 function toggleTaskInspector(id) {
