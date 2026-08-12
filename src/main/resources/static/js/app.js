@@ -5,10 +5,10 @@ const state = {
     currentRoute: '',
     adminTab: 'teachers', // 'teachers' | 'tasks' | 'monitoring' | 'dictionaries'
     teacherTab: 'variants', // 'variants' | 'create-variant' | 'students' | 'profile'
-    adminTasks: [],
-    adminTeachers: [],
-    teacherVariants: [],
-    teacherStudents: [],
+    adminTasks: null,
+    adminTeachers: null,
+    teacherVariants: null,
+    teacherStudents: null,
     selectedTaskIds: [],
     studentTest: null,
     studentAttempt: null,
@@ -1100,7 +1100,10 @@ function changeTaskPage(page) {
 
 function resetTaskFilters() {
     state.taskFilters = { search: '', taskNumber: '', subject: '', exam: '', bank: '', subtopic: '', pageSize: 20, currentPage: 1 };
-    loadAdminTabContent(true);
+    const container = document.getElementById('admin-tab-content');
+    if (container) {
+        loadAdminTasksTab(container, false);
+    }
 }
 
 function toggleTaskInspector(id) {
@@ -1192,7 +1195,7 @@ function renderEditTaskModal(id) {
                     </div>
 
                     <div class="card" style="margin-bottom:1rem; padding:0.8rem; background:var(--bg-hover); border:1px solid var(--border-color);">
-                        <div style="font-size:0.8rem; font-weight:600; margin-bottom:0.4rem; color:var(--text-secondary);">👁️ Живое превью формул:</div>
+                        <div style="font-size:0.8rem; font-weight:600; margin-bottom:0.4rem; color:var(--text-secondary);">Живое превью формул:</div>
                         <div id="live-task-preview" class="task-content" style="min-height:30px;">${task.content || ''}</div>
                     </div>
 
@@ -1203,7 +1206,7 @@ function renderEditTaskModal(id) {
 
                     <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; background: var(--bg-hover); padding: 0.6rem 0.8rem; border-radius: 0.4rem; border: 1px solid var(--border-color);">
                         <input type="checkbox" id="edit-task-has-detailed-answer" ${task.hasDetailedAnswer ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
-                        <label for="edit-task-has-detailed-answer" class="form-label" style="margin: 0; cursor: pointer; font-weight: 600;">☑️ Задача с развёрнутым ответом (ручная проверка)</label>
+                        <label for="edit-task-has-detailed-answer" class="form-label" style="margin: 0; cursor: pointer; font-weight: 600;">Задача с развёрнутым ответом (ручная проверка)</label>
                     </div>
 
                     <div class="form-group">
@@ -1326,7 +1329,7 @@ function renderCreateTaskModal() {
                     </div>
 
                     <div class="card" style="margin-bottom:1rem; padding:0.8rem; background:var(--bg-hover); border:1px solid var(--border-color);">
-                        <div style="font-size:0.8rem; font-weight:600; margin-bottom:0.4rem; color:var(--text-secondary);">👁️ Живое превью формул:</div>
+                        <div style="font-size:0.8rem; font-weight:600; margin-bottom:0.4rem; color:var(--text-secondary);">Живое превью формул:</div>
                         <div id="live-task-preview" class="task-content" style="min-height:30px;">
                             <span style="color:var(--text-secondary); font-style:italic;">Введите текст задачи или формулы LaTeX ($...$)...</span>
                         </div>
@@ -1339,7 +1342,7 @@ function renderCreateTaskModal() {
 
                     <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; background: var(--bg-hover); padding: 0.6rem 0.8rem; border-radius: 0.4rem; border: 1px solid var(--border-color);">
                         <input type="checkbox" id="task-has-detailed-answer" style="width: 18px; height: 18px; cursor: pointer;">
-                        <label for="task-has-detailed-answer" class="form-label" style="margin: 0; cursor: pointer; font-weight: 600;">☑️ Задача с развёрнутым ответом (ручная проверка)</label>
+                        <label for="task-has-detailed-answer" class="form-label" style="margin: 0; cursor: pointer; font-weight: 600;">Задача с развёрнутым ответом (ручная проверка)</label>
                     </div>
 
                     <div class="form-group">
