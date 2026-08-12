@@ -44,8 +44,17 @@ public class Task extends BaseEntity {
     @Column(nullable = false)
     private Integer taskNumber;
 
-    @Column(nullable = false, length = 300)
+    @Column(name = "task_variant", length = 100)
+    private String taskVariant;
+
+    @Column(name = "topic", length = 300)
+    private String topic;
+
+    @Column(name = "subtopic", length = 300)
     private String subtopic;
+
+    @Column(name = "task_type", length = 100)
+    private String taskType;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;

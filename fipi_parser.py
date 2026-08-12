@@ -93,7 +93,10 @@ MATH_EXCEL_COLUMNS: tuple[str, ...] = (
     "exam_type",
     "task_bank",
     "task_number",
+    "task_variant",
+    "topic",
     "subtopic",
+    "task_type",
     "question",
     "image_files",
     "correct_answer",
@@ -971,8 +974,11 @@ MATH_EXCEL_COLUMNS: list[str] = [
     "subject",       # Название предмета
     "exam_type",     # EGE / OGE
     "task_bank",     # Всегда FIPI
-    "task_number",   # ПУСТО — ручная разметка
-    "subtopic",      # ПУСТО — ручная разметка
+    "task_number",   # № КИМ (ручная разметка)
+    "task_variant",  # Вариант задания (ручная разметка)
+    "topic",         # Тема (ручная разметка)
+    "subtopic",      # Подтема (ручная разметка)
+    "task_type",     # Тип задания (ручная разметка)
     "question",      # Текст задачи (LaTeX)
     "image_files",   # Ссылки на картинки через запятую
     "correct_answer",# Ответ, если есть
@@ -1200,9 +1206,12 @@ def export_math_fipi_to_review_excel(
     # task_bank: всегда FIPI
     df["task_bank"] = "FIPI"
 
-    # task_number, subtopic: пустые поля для ручной разметки
-    df["task_number"] = df["task_number"].fillna("").astype(str) if "task_number" in df.columns else ""
-    df["subtopic"]    = ""
+    # task_number, task_variant, topic, subtopic, task_type
+    df["task_number"]  = df["task_number"].fillna("").astype(str) if "task_number" in df.columns else ""
+    df["task_variant"] = df["task_variant"].fillna("").astype(str) if "task_variant" in df.columns else ""
+    df["topic"]        = df["topic_group"].fillna("").astype(str) if "topic_group" in df.columns else (df["topic"].fillna("").astype(str) if "topic" in df.columns else "")
+    df["subtopic"]     = df["topics"].fillna("").astype(str) if "topics" in df.columns else (df["subtopic"].fillna("").astype(str) if "subtopic" in df.columns else "")
+    df["task_type"]    = df["task_type"].fillna("").astype(str) if "task_type" in df.columns else ""
     df["answer_type"] = df["answer_type"].fillna("").astype(str) if "answer_type" in df.columns else ""
     df["has_detailed_answer"] = df.apply(
         lambda r: (
@@ -1353,8 +1362,11 @@ def export_math_fipi_to_review_excel(
         "subject":        {"width": 30,  "manual": False},
         "exam_type":      {"width": 10,  "manual": False},
         "task_bank":      {"width": 12,  "manual": False},
-        "task_number":    {"width": 14,  "manual": True},   # ← ручная разметка
-        "subtopic":       {"width": 35,  "manual": True},   # ← ручная разметка
+        "task_number":    {"width": 14,  "manual": True},   # ← ручная разметка (№ КИМ)
+        "task_variant":   {"width": 18,  "manual": True},   # ← ручная разметка (Вариант)
+        "topic":          {"width": 30,  "manual": True},   # ← ручная разметка (Тема)
+        "subtopic":       {"width": 35,  "manual": True},   # ← ручная разметка (Подтема)
+        "task_type":      {"width": 20,  "manual": True},   # ← ручная разметка (Тип задания)
         "question":       {"width": 80,  "manual": False},
         "image_files":    {"width": 40,  "manual": False},
         "correct_answer": {"width": 18,  "manual": False},

@@ -27,9 +27,17 @@ public class CreateTaskRequest {
     @Min(1)
     private Integer taskNumber;
 
-    @NotBlank
+    @Size(max = 100)
+    private String taskVariant;
+
+    @Size(max = 300)
+    private String topic;
+
     @Size(max = 300)
     private String subtopic;
+
+    @Size(max = 100)
+    private String taskType;
 
     @NotBlank
     private String content;

@@ -126,10 +126,39 @@ public class ZipImportService {
                     String examStr = getCellValue(row, 2);
                     String bankStr = getCellValue(row, 3);
                     String taskNumStr = getCellValue(row, 4);
-                    String subtopicStr = getCellValue(row, 5);
-                    String questionStr = getCellValue(row, 6);
-                    String imageFilesStr = getCellValue(row, 7);
-                    String answerStr = getCellValue(row, 8);
+
+                    // Детекция формата: 14 колонок (новый) vs 11/9 колонок (старый)
+                    int lastCell = row.getLastCellNum();
+                    String taskVariantStr = "";
+                    String topicStr = "";
+                    String subtopicStr = "";
+                    String taskTypeStr = "";
+                    String questionStr = "";
+                    String imageFilesStr = "";
+                    String answerStr = "";
+                    String hasDetailedStr = "";
+                    String answerTypeStr = "";
+
+                    if (lastCell >= 14 || (lastCell >= 10 && getCellValue(row, 9).length() > 5)) {
+                        // Новый 14-колоночный формат
+                        taskVariantStr = getCellValue(row, 5);
+                        topicStr       = getCellValue(row, 6);
+                        subtopicStr    = getCellValue(row, 7);
+                        taskTypeStr    = getCellValue(row, 8);
+                        questionStr    = getCellValue(row, 9);
+                        imageFilesStr  = getCellValue(row, 10);
+                        answerStr      = getCellValue(row, 11);
+                        hasDetailedStr = getCellValue(row, 12);
+                        answerTypeStr  = getCellValue(row, 13);
+                    } else {
+                        // Старый 9/11-колоночный формат
+                        subtopicStr    = getCellValue(row, 5);
+                        questionStr    = getCellValue(row, 6);
+                        imageFilesStr  = getCellValue(row, 7);
+                        answerStr      = getCellValue(row, 8);
+                        hasDetailedStr = getCellValue(row, 9);
+                        answerTypeStr  = getCellValue(row, 10);
+                    }
 
                     if (subjStr.isBlank() && questionStr.isBlank()) {
                         continue; // Пустая строка
@@ -171,13 +200,14 @@ public class ZipImportService {
                     task.setSubject(subject);
                     task.setExamType(examType);
                     task.setTaskNumber(taskNumber);
+                    task.setTaskVariant(taskVariantStr);
+                    task.setTopic(topicStr);
                     task.setSubtopic(subtopicStr.isBlank() ? "Общие задания" : subtopicStr);
+                    task.setTaskType(taskTypeStr);
                     task.setContent(com.example.test_platform.util.FipiTextNormalizer.normalize(questionStr));
                     task.setCorrectAnswer(answerStr);
                     task.setActive(true);
 
-                    String hasDetailedStr = getCellValue(row, 9);
-                    String answerTypeStr = getCellValue(row, 10);
                     String normalizedAnswer = answerStr.trim().toLowerCase();
 
                     boolean hasDetailed = "true".equalsIgnoreCase(hasDetailedStr) || "1".equals(hasDetailedStr)

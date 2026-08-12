@@ -189,6 +189,44 @@ function triggerKaTeX() {
     }
 }
 
+// --- Global Interactive Image Lightbox Zoom Listener ---
+document.addEventListener('click', (e) => {
+    const img = e.target.closest('img.task-img, .task-content img, img.zoomable, .task-image-preview');
+    if (img && !img.closest('.image-lightbox')) {
+        openImageLightbox(img.src);
+        e.stopPropagation();
+    }
+});
+
+function openImageLightbox(src) {
+    if (!src) return;
+    let lightbox = document.getElementById('image-lightbox');
+    if (!lightbox) {
+        lightbox = document.createElement('div');
+        lightbox.id = 'image-lightbox';
+        lightbox.className = 'image-lightbox';
+        lightbox.innerHTML = `
+            <span class="image-lightbox-close" onclick="closeImageLightbox()">&times;</span>
+            <img id="image-lightbox-img" class="image-lightbox-content" src="" alt="Увеличенное изображение">
+        `;
+        lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox || e.target.classList.contains('image-lightbox-close')) {
+                closeImageLightbox();
+            }
+        });
+        document.body.appendChild(lightbox);
+    }
+    document.getElementById('image-lightbox-img').src = src;
+    lightbox.style.display = 'flex';
+}
+
+function closeImageLightbox() {
+    const lightbox = document.getElementById('image-lightbox');
+    if (lightbox) {
+        lightbox.style.display = 'none';
+    }
+}
+
 function updateTaskContentPreview(val) {
     const preview = document.getElementById('live-task-preview');
     if (preview) {
@@ -975,7 +1013,10 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
         if (f.subject && t.subject !== f.subject) return false;
         if (f.exam && t.examType !== f.exam) return false;
         if (f.bank && t.taskBank !== f.bank) return false;
+        if (f.variant && (!t.taskVariant || !t.taskVariant.toLowerCase().includes(f.variant.toLowerCase()))) return false;
+        if (f.topic && (!t.topic || !t.topic.toLowerCase().includes(f.topic.toLowerCase()))) return false;
         if (f.subtopic && (!t.subtopic || !t.subtopic.toLowerCase().includes(f.subtopic.toLowerCase()))) return false;
+        if (f.taskType && (!t.taskType || !t.taskType.toLowerCase().includes(f.taskType.toLowerCase()))) return false;
         if (f.taskNumber && String(t.taskNumber || '').trim() !== String(f.taskNumber).trim()) return false;
         return true;
     });
@@ -1014,6 +1055,18 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
                     <input type="number" id="task-filter-number" class="form-control" placeholder="1, 2, 3..." value="${f.taskNumber || ''}" oninput="updateTaskFilterState('taskNumber', this.value)">
                 </div>
                 <div>
+                    <label class="form-label" style="font-size:0.8rem;">Вариант</label>
+                    <input type="text" id="task-filter-variant" class="form-control" placeholder="Вариант 1..." value="${f.variant || ''}" oninput="updateTaskFilterState('variant', this.value)">
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:0.8rem;">Тема</label>
+                    <input type="text" id="task-filter-topic" class="form-control" placeholder="Тема..." value="${f.topic || ''}" oninput="updateTaskFilterState('topic', this.value)">
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:0.8rem;">Подтема</label>
+                    <input type="text" id="task-filter-subtopic" class="form-control" placeholder="Подтема..." value="${f.subtopic || ''}" oninput="updateTaskFilterState('subtopic', this.value)">
+                </div>
+                <div>
                     <label class="form-label" style="font-size:0.8rem;">Предмет</label>
                     <select id="task-filter-subject" class="form-control" onchange="updateTaskFilterState('subject', this.value)">
                         <option value="">Все предметы</option>
@@ -1028,18 +1081,7 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
                     </select>
                 </div>
                 <div>
-                    <label class="form-label" style="font-size:0.8rem;">Банк</label>
-                    <select id="task-filter-bank" class="form-control" onchange="updateTaskFilterState('bank', this.value)">
-                        <option value="">Все банки</option>
-                        ${state.dictionaries.banks.map(b => `<option value="${b.name}" ${f.bank === b.name ? 'selected' : ''}>${b.displayName}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="form-label" style="font-size:0.8rem;">Подтема</label>
-                    <input type="text" id="task-filter-subtopic" class="form-control" placeholder="Подтема..." value="${f.subtopic || ''}" oninput="updateTaskFilterState('subtopic', this.value)">
-                </div>
-                <div>
-                    <label class="form-label" style="font-size:0.8rem; font-weight: 700; color: var(--accent-color);">Показывать по</label>
+                    <label class="form-label" style="font-size:0.8rem;">Показывать по</label>
                     <select id="task-filter-size" class="form-control" style="font-weight: 600;" onchange="updateTaskFilterState('pageSize', parseInt(this.value))">
                         <option value="10" ${pageSize === 10 ? 'selected' : ''}>10 задач</option>
                         <option value="20" ${pageSize === 20 ? 'selected' : ''}>20 задач</option>
@@ -1051,15 +1093,15 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
             </div>
         </div>
 
-        <div class="card" style="padding: 0; overflow: hidden; margin-bottom: 1rem;">
+        <div class="card table-responsive" style="padding: 0; overflow-x: auto; margin-bottom: 1rem;">
             <table style="width: 100%; border-collapse: collapse;">
                 <thead>
                     <tr style="background: var(--bg-hover); text-align: left;">
                         <th style="padding: 1rem;">Public ID</th>
-                        <th style="padding: 1rem;">Экзамен / Предмет</th>
+                        <th style="padding: 1rem;">Предмет / Экзамен</th>
                         <th style="padding: 1rem;">№ КИМ</th>
-                        <th style="padding: 1rem;">Подтема</th>
-                        <th style="padding: 1rem;">Банк</th>
+                        <th style="padding: 1rem;">Вариант</th>
+                        <th style="padding: 1rem;">Тема / Подтема</th>
                         <th style="padding: 1rem;">Ответ</th>
                         <th style="padding: 1rem;">Действия</th>
                     </tr>
@@ -1070,8 +1112,11 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
                             <td style="padding: 1rem;"><code>${t.publicId}</code></td>
                             <td style="padding: 1rem;"><strong>${t.examType}</strong> / ${t.subject}</td>
                             <td style="padding: 1rem;"><span class="badge badge-warning">Задание №${t.taskNumber || '—'}</span></td>
-                            <td style="padding: 1rem;">${t.subtopic || '—'}</td>
-                            <td style="padding: 1rem;"><span class="badge badge-info">${t.taskBank}</span></td>
+                            <td style="padding: 1rem;">${t.taskVariant ? `<span class="badge badge-info">${t.taskVariant}</span>` : '—'}</td>
+                            <td style="padding: 1rem;">
+                                <div><strong>${t.topic || '—'}</strong></div>
+                                <div style="font-size:0.8rem; color:var(--text-secondary);">${t.subtopic || ''}</div>
+                            </td>
                             <td style="padding: 1rem;">${t.hasDetailedAnswer ? '<span class="badge badge-warning" title="Задача с развёрнутым ответом">Развёрнутый</span>' : `<code>${t.correctAnswer || '—'}</code>`}</td>
                             <td style="padding: 1rem;">
                                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
@@ -1082,7 +1127,7 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
                             </td>
                         </tr>
                         <tr id="task-detail-row-${t.id}" style="display: none; background: var(--bg-hover);">
-                            <td colspan="7" style="padding: 1.2rem;">
+                            <td colspan="8" style="padding: 1.2rem;">
                                 <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary);">Полный текст задачи (${t.publicId}):</div>
                                 <div class="task-content" style="padding: 1rem; background: var(--bg-card); border-radius: 0.5rem; border: 1px solid var(--border-color); margin-bottom: 1rem;">
                                     ${t.content || ''}
@@ -1092,17 +1137,22 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
                                         ${t.images.map((img, i) => `
                                             <div class="task-image-item">
                                                 ${t.images.length > 1 ? `<span class="image-option-badge">${i + 1})</span>` : ''}
-                                                <img src="${img.url}" style="max-width: 260px; border-radius: 0.5rem; border: 1px solid var(--border-color);">
+                                                <img src="${img.url}" class="zoomable" style="max-width: 260px; border-radius: 0.5rem; border: 1px solid var(--border-color);">
                                             </div>
                                         `).join('')}
                                     </div>
                                 ` : ''}
                                 <div style="font-size: 0.9rem;">
+                                    <strong>№ КИМ:</strong> ${t.taskNumber || '—'} | 
+                                    <strong>Вариант:</strong> ${t.taskVariant || '—'} | 
+                                    <strong>Тема:</strong> ${t.topic || '—'} | 
+                                    <strong>Подтема:</strong> ${t.subtopic || '—'} | 
+                                    <strong>Тип:</strong> ${t.taskType || '—'} | 
                                     <strong>Правильный ответ:</strong> <code style="color: var(--success); font-size: 1rem;">${t.correctAnswer || '—'}</code>
                                 </div>
                             </td>
                         </tr>
-                    `).join('') || '<tr><td colspan="7" style="padding: 2rem; text-align: center; color: var(--text-secondary);">Задачи по выбранным фильтрам не найдены</td></tr>'}
+                    `).join('') || '<tr><td colspan="8" style="padding: 2rem; text-align: center; color: var(--text-secondary);">Задачи по выбранным фильтрам не найдены</td></tr>'}
                 </tbody>
             </table>
         </div>
@@ -1204,9 +1254,26 @@ function renderEditTaskModal(id) {
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Тема / Подтема</label>
-                        <input type="text" id="edit-task-subtopic" class="form-control" value="${task.subtopic || ''}" required>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Вариант задания</label>
+                            <input type="text" id="edit-task-variant" class="form-control" value="${task.taskVariant || ''}" placeholder="Вариант 1">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Тип задания</label>
+                            <input type="text" id="edit-task-type" class="form-control" value="${task.taskType || ''}" placeholder="Текстовая задача">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Тема</label>
+                            <input type="text" id="edit-task-topic" class="form-control" value="${task.topic || ''}" placeholder="Тригонометрия">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Подтема</label>
+                            <input type="text" id="edit-task-subtopic" class="form-control" value="${task.subtopic || ''}" placeholder="Тригонометрические уравнения">
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -1261,7 +1328,10 @@ function renderEditTaskModal(id) {
         const examType = document.getElementById('edit-task-exam').value;
         const taskBank = document.getElementById('edit-task-bank').value;
         const taskNumber = parseInt(document.getElementById('edit-task-number').value, 10);
-        const subtopic = document.getElementById('edit-task-subtopic').value.trim();
+        const taskVariant = (document.getElementById('edit-task-variant')?.value || '').trim();
+        const topic = (document.getElementById('edit-task-topic')?.value || '').trim();
+        const subtopic = (document.getElementById('edit-task-subtopic')?.value || '').trim();
+        const taskType = (document.getElementById('edit-task-type')?.value || '').trim();
         const content = document.getElementById('edit-task-content').value.trim();
         const correctAnswer = document.getElementById('edit-task-correct-answer').value.trim();
         const hasDetailedAnswer = document.getElementById('edit-task-has-detailed-answer').checked;
@@ -1270,7 +1340,7 @@ function renderEditTaskModal(id) {
             const updatedTask = await apiFetch(`/api/admin/tasks/${id}`, {
                 method: 'PUT',
                 body: JSON.stringify({
-                    subject, examType, taskBank, taskNumber, subtopic, content, correctAnswer, hasDetailedAnswer, active: true
+                    subject, examType, taskBank, taskNumber, taskVariant, topic, subtopic, taskType, content, correctAnswer, hasDetailedAnswer, active: true
                 })
             });
 
@@ -1338,9 +1408,26 @@ function renderCreateTaskModal() {
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Тема / Подтема</label>
-                        <input type="text" id="task-subtopic" class="form-control" placeholder="Векторы на плоскости" required>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Вариант задания</label>
+                            <input type="text" id="task-variant" class="form-control" placeholder="Вариант 1">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Тип задания</label>
+                            <input type="text" id="task-type" class="form-control" placeholder="Текстовая задача">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Тема</label>
+                            <input type="text" id="task-topic" class="form-control" placeholder="Тригонометрия">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Подтема</label>
+                            <input type="text" id="task-subtopic" class="form-control" placeholder="Тригонометрические уравнения">
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -1397,7 +1484,10 @@ function renderCreateTaskModal() {
         const examType = document.getElementById('task-exam').value;
         const taskBank = document.getElementById('task-bank').value;
         const taskNumber = parseInt(document.getElementById('task-number').value, 10);
-        const subtopic = document.getElementById('task-subtopic').value.trim();
+        const taskVariant = (document.getElementById('task-variant')?.value || '').trim();
+        const topic = (document.getElementById('task-topic')?.value || '').trim();
+        const subtopic = (document.getElementById('task-subtopic')?.value || '').trim();
+        const taskType = (document.getElementById('task-type')?.value || '').trim();
         const content = document.getElementById('task-content').value.trim();
         const correctAnswer = document.getElementById('task-correct-answer').value.trim();
         const hasDetailedAnswer = document.getElementById('task-has-detailed-answer').checked;
@@ -1406,7 +1496,7 @@ function renderCreateTaskModal() {
             const savedTask = await apiFetch('/api/admin/tasks', {
                 method: 'POST',
                 body: JSON.stringify({
-                    subject, examType, taskBank, taskNumber, subtopic, content, correctAnswer, hasDetailedAnswer
+                    subject, examType, taskBank, taskNumber, taskVariant, topic, subtopic, taskType, content, correctAnswer, hasDetailedAnswer
                 })
             });
 

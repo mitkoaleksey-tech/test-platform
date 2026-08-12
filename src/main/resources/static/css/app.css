@@ -592,3 +592,131 @@ textarea.form-control {
     font-weight: 800;
     color: var(--primary);
 }
+
+/* --- Interactive Image Lightbox Zoom --- */
+.task-content img, .task-img, img.zoomable, .task-image-preview {
+    cursor: zoom-in;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border-radius: var(--radius-sm);
+    max-width: 100%;
+    height: auto;
+}
+.task-content img:hover, .task-img:hover, img.zoomable:hover {
+    transform: scale(1.015);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.image-lightbox {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.88);
+    backdrop-filter: blur(8px);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1.5rem;
+    cursor: zoom-out;
+    opacity: 0;
+    animation: lightboxFadeIn 0.2s forwards cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes lightboxFadeIn {
+    to { opacity: 1; }
+}
+
+.image-lightbox-content {
+    max-width: 92vw;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: var(--radius);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    transform: scale(0.95);
+    animation: lightboxZoomIn 0.2s forwards cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes lightboxZoomIn {
+    to { transform: scale(1); }
+}
+
+.image-lightbox-close {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+.image-lightbox-close:hover {
+    background: rgba(255, 255, 255, 0.4);
+    transform: scale(1.1);
+}
+
+/* --- Mobile & Responsive Adaptation --- */
+@media (max-width: 768px) {
+    .navbar {
+        padding: 0.75rem 1rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .navbar-brand {
+        font-size: 1.15rem;
+    }
+    .navbar-user {
+        font-size: 0.85rem;
+        gap: 0.5rem;
+    }
+    .container {
+        padding: 0.75rem !important;
+    }
+    .card {
+        padding: 1rem !important;
+        border-radius: var(--radius-sm) !important;
+    }
+    .table-responsive {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    table {
+        min-width: 550px;
+    }
+    .grid-2, .grid-3, .grid-4 {
+        grid-template-columns: 1fr !important;
+    }
+    .task-number-grid {
+        gap: 0.35rem !important;
+    }
+    .task-number-btn {
+        width: 38px !important;
+        height: 38px !important;
+        font-size: 0.85rem !important;
+    }
+    .modal-dialog {
+        width: 95vw !important;
+        max-width: 95vw !important;
+        margin: 1rem auto !important;
+        padding: 1rem !important;
+    }
+    .btn {
+        padding: 0.6rem 1rem !important;
+        font-size: 0.9rem !important;
+        min-height: 42px;
+    }
+    .form-control, select, input {
+        font-size: 1rem !important; /* Prevents iOS safari zoom on focus */
+    }
+}

@@ -22,7 +22,10 @@ public class TaskResponse {
     private final TaskBank taskBank;
     private final ExamType examType;
     private final Integer taskNumber;
+    private final String taskVariant;
+    private final String topic;
     private final String subtopic;
+    private final String taskType;
     private final String content;
     private final String correctAnswer;
     private final boolean active;
@@ -51,7 +54,10 @@ public class TaskResponse {
                 .taskBank(task.getTaskBank())
                 .examType(task.getExamType())
                 .taskNumber(task.getTaskNumber() != null ? task.getTaskNumber() : 0)
+                .taskVariant(task.getTaskVariant() != null ? task.getTaskVariant() : "")
+                .topic(task.getTopic() != null ? task.getTopic() : "")
                 .subtopic(task.getSubtopic() != null ? task.getSubtopic() : "")
+                .taskType(task.getTaskType() != null ? task.getTaskType() : "")
                 .content(task.getContent() != null ? task.getContent() : "")
                 .correctAnswer(task.getCorrectAnswer() != null ? task.getCorrectAnswer() : "")
                 .active(task.isActive())

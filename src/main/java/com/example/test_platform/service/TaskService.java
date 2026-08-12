@@ -55,7 +55,8 @@ public class TaskService {
         task.setPublicId(generateUniquePublicId());
         task.setExternalId(request.getExternalId());
         applyTaskData(task, request.getSubject(), request.getTaskBank(), request.getExamType(),
-                request.getTaskNumber(), request.getSubtopic(), request.getContent(),
+                request.getTaskNumber(), request.getTaskVariant(), request.getTopic(),
+                request.getSubtopic(), request.getTaskType(), request.getContent(),
                 request.getCorrectAnswer(), true, Boolean.TRUE.equals(request.getHasDetailedAnswer()));
 
         return TaskResponse.from(taskRepository.save(task), storageProperties);
@@ -65,7 +66,8 @@ public class TaskService {
     public TaskResponse updateTask(Long id, UpdateTaskRequest request) {
         Task task = getTaskEntity(id);
         applyTaskData(task, request.getSubject(), request.getTaskBank(), request.getExamType(),
-                request.getTaskNumber(), request.getSubtopic(), request.getContent(),
+                request.getTaskNumber(), request.getTaskVariant(), request.getTopic(),
+                request.getSubtopic(), request.getTaskType(), request.getContent(),
                 request.getCorrectAnswer(), request.isActive(),
                 request.getHasDetailedAnswer() != null ? request.getHasDetailedAnswer() : task.isHasDetailedAnswer());
 
@@ -137,7 +139,10 @@ public class TaskService {
             TaskBank taskBank,
             ExamType examType,
             Integer taskNumber,
+            String taskVariant,
+            String topic,
             String subtopic,
+            String taskType,
             String content,
             String correctAnswer,
             boolean active,
@@ -147,7 +152,10 @@ public class TaskService {
         task.setTaskBank(taskBank);
         task.setExamType(examType);
         task.setTaskNumber(taskNumber);
+        task.setTaskVariant(taskVariant != null ? taskVariant.trim() : "");
+        task.setTopic(topic != null ? topic.trim() : "");
         task.setSubtopic(subtopic != null ? subtopic.trim() : "");
+        task.setTaskType(taskType != null ? taskType.trim() : "");
         task.setContent(com.example.test_platform.util.FipiTextNormalizer.normalize(content));
         task.setCorrectAnswer(correctAnswer);
         task.setActive(active);
