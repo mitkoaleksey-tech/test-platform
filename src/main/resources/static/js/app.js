@@ -142,15 +142,17 @@ function applyInputMasks() {
 
 // KaTeX LaTeX renderer helper
 function triggerKaTeX() {
-    // 0. Unwrap any FIPI pseudo-math tables before KaTeX renders!
+    // 0. Unwrap any FIPI pseudo-math tables and clean dollar-brace syntax before KaTeX renders!
     try {
-        document.querySelectorAll('.task-content, .card, td').forEach(el => {
+        document.querySelectorAll('.task-content, .card, td, .task-item, p, div').forEach(el => {
             const mathTables = el.querySelectorAll('table.fipi-table, table');
             mathTables.forEach(table => {
                 const text = table.textContent || '';
-                if (text.includes('$') || text.includes('\\frac') || text.includes('^2') || text.includes('x-a^2')) {
+                if (text.includes('$') || text.includes('\\frac') || text.includes('^2') || text.includes('x-a^2') || text.includes('\\begin')) {
                     let cleanMath = text.replace(/\s+/g, ' ').trim();
-                    if (!cleanMath.startsWith('$')) cleanMath = '$' + cleanMath + '$';
+                    cleanMath = cleanMath.replace(/^\$\{\s*/, '$').replace(/\s*\}\$$/, '$');
+                    if (!cleanMath.startsWith('$')) cleanMath = '$' + cleanMath;
+                    if (!cleanMath.endsWith('$')) cleanMath = cleanMath + '$';
                     cleanMath = cleanMath.replace(/\$\$/g, '$');
                     const span = document.createElement('span');
                     span.className = 'fipi-math-unwrapped';
@@ -161,6 +163,12 @@ function triggerKaTeX() {
                     }
                 }
             });
+            // Clean dollar-brace artifact (${...}$) in text nodes
+            if (el.children.length === 0 && el.textContent.includes('${')) {
+                el.textContent = el.textContent
+                    .replace(/\$\{\s*/g, '$')
+                    .replace(/\s*\}\$/g, '$');
+            }
         });
     } catch (ignored) {}
 

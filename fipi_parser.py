@@ -198,11 +198,19 @@ def clean_fipi_question_text(text: str, options_raw: object = None) -> str:
         table_html = m.group(0)
         cells_text = re.sub(r'</?(?:table|tr|th|td)[^>]*>', ' ', table_html)
         cells_text = re.sub(r'\s+', ' ', cells_text).strip()
+        # Очищаем битый синтаксис ${...}$ и ${\begin...
+        cells_text = re.sub(r'^\$\{\s*', '$', cells_text)
+        cells_text = re.sub(r'\s*\}\$$', '$', cells_text)
         if not cells_text.startswith('$'):
-            cells_text = f" ${cells_text}$ "
+            cells_text = f"${cells_text}"
+        if not cells_text.endswith('$'):
+            cells_text = f"{cells_text}$"
         return f" {cells_text} "
 
     cleaned = re.sub(r'<table[^>]*>\s*<tr>\s*(?:<th[^>]*>.*?</th>|<td[^>]*>.*?</td>)+\s*</tr>\s*</table>', _unwrap_fipi_math_table, cleaned, flags=re.DOTALL | re.IGNORECASE)
+    # Нормализация остаточных опечаток ${...}$ в тексте
+    cleaned = re.sub(r'\$\{\s*', '$', cleaned)
+    cleaned = re.sub(r'\s*\}\$', '$', cleaned)
 
     # 1. Замена KaTeX <span class="katex">...<annotation encoding="application/x-tex">...
     def _replace_katex(m: re.Match) -> str:
