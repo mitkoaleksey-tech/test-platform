@@ -17,6 +17,7 @@ public class DatabaseMigrationService {
     public void migrateNewTaskColumns() {
         try {
             log.info("Checking database schema migrations for tasks table...");
+            jdbcTemplate.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS has_detailed_answer BOOLEAN DEFAULT FALSE NOT NULL;");
             jdbcTemplate.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS task_variant VARCHAR(100);");
             jdbcTemplate.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS topic VARCHAR(300);");
             jdbcTemplate.execute("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS subtopic VARCHAR(300);");
