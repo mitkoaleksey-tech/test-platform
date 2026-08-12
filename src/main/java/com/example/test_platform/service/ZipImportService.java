@@ -120,31 +120,33 @@ public class ZipImportService {
                     if (isHeader) {
                         isHeader = false; // Парсим заголовки столбцов из первой строки таблицы
                         for (Cell cell : row) {
-                            String colName = getCellValue(row, cell.getColumnIndex()).toLowerCase().trim();
+                            String colName = getCellValue(row, cell.getColumnIndex()).toLowerCase().replaceAll("[\\s\\u00a0\\ufeff]+", " ").trim();
                             if (!colName.isBlank()) {
                                 colMap.put(colName, cell.getColumnIndex());
                             }
                         }
+                        log.info("Парсер Excel: обнаружены заголовки колонок ({}): {}", colMap.size(), colMap);
                         continue;
                     }
 
-                    // Чтение ячеек по динамической карте заголовков (с резервными фоллбэками для любых версий файла)
-                    int questionDefaultIdx = (colMap.containsKey("question") ? colMap.get("question") : (colMap.size() >= 14 ? 9 : 6));
+                    // Определение индекса колонки вопроса с адаптивным фоллбэком по строке
+                    int questionIdx = findQuestionColumnIndex(row, colMap);
+                    boolean is14Layout = (questionIdx == 9);
 
                     String extId          = getCellValueByName(row, colMap, "external_id", 0);
                     String subjStr        = getCellValueByName(row, colMap, "subject", 1);
                     String examStr        = getCellValueByName(row, colMap, "exam_type", 2);
                     String bankStr        = getCellValueByName(row, colMap, "task_bank", 3);
                     String taskNumStr     = getCellValueByName(row, colMap, "task_number", 4);
-                    String taskVariantStr = getCellValueByName(row, colMap, "task_variant", -1);
-                    String topicStr       = getCellValueByName(row, colMap, "topic", -1);
-                    String subtopicStr    = getCellValueByName(row, colMap, "subtopic", questionDefaultIdx == 9 ? 7 : 5);
-                    String taskTypeStr    = getCellValueByName(row, colMap, "task_type", -1);
-                    String questionStr    = getCellValueByName(row, colMap, "question", questionDefaultIdx);
-                    String imageFilesStr  = getCellValueByName(row, colMap, "image_files", questionDefaultIdx == 9 ? 10 : 7);
-                    String answerStr      = getCellValueByName(row, colMap, "correct_answer", questionDefaultIdx == 9 ? 11 : 8);
-                    String hasDetailedStr = getCellValueByName(row, colMap, "has_detailed_answer", questionDefaultIdx == 9 ? 12 : 9);
-                    String answerTypeStr  = getCellValueByName(row, colMap, "answer_type", questionDefaultIdx == 9 ? 13 : 10);
+                    String taskVariantStr = getCellValueByName(row, colMap, "task_variant", is14Layout ? 5 : -1);
+                    String topicStr       = getCellValueByName(row, colMap, "topic", is14Layout ? 6 : -1);
+                    String subtopicStr    = getCellValueByName(row, colMap, "subtopic", is14Layout ? 7 : 5);
+                    String taskTypeStr    = getCellValueByName(row, colMap, "task_type", is14Layout ? 8 : -1);
+                    String questionStr    = getCellValue(row, questionIdx);
+                    String imageFilesStr  = getCellValueByName(row, colMap, "image_files", is14Layout ? 10 : 7);
+                    String answerStr      = getCellValueByName(row, colMap, "correct_answer", is14Layout ? 11 : 8);
+                    String hasDetailedStr = getCellValueByName(row, colMap, "has_detailed_answer", is14Layout ? 12 : 9);
+                    String answerTypeStr  = getCellValueByName(row, colMap, "answer_type", is14Layout ? 13 : 10);
 
                     if (subjStr.isBlank() && questionStr.isBlank()) {
                         continue; // Пустая строка
@@ -303,6 +305,26 @@ public class ZipImportService {
             return getCellValue(row, defaultIndex);
         }
         return "";
+    }
+
+    private int findQuestionColumnIndex(Row row, Map<String, Integer> colMap) {
+        String[] questionAliases = {"question", "content", "text", "вопрос", "задание", "текст", "формулировка"};
+        for (String alias : questionAliases) {
+            Integer idx = colMap.get(alias);
+            if (idx != null && idx >= 0) {
+                return idx;
+            }
+        }
+        // Если в заголовках явного названия нет — проверяем непустые ячейки в самой строке:
+        String valAt9 = getCellValue(row, 9);
+        if (!valAt9.isBlank()) {
+            return 9;
+        }
+        String valAt6 = getCellValue(row, 6);
+        if (!valAt6.isBlank()) {
+            return 6;
+        }
+        return 9;
     }
 
     private Subject parseSubject(String str) {
