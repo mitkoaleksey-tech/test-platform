@@ -25,10 +25,14 @@ public class DictionaryService {
     private final SystemExamTypeRepository examTypeRepository;
     private final SystemTaskBankRepository taskBankRepository;
     private final KimTaskSettingRepository kimTaskSettingRepository;
+    private final jakarta.persistence.EntityManager entityManager;
 
     @PostConstruct
     @Transactional
     public void initDefaultDictionaries() {
+        try {
+            entityManager.createNativeQuery("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS has_detailed_answer BOOLEAN DEFAULT FALSE").executeUpdate();
+        } catch (Exception ignored) {}
         if (!subjectRepository.existsByName("MATHEMATICS")) {
             SystemSubject math = new SystemSubject();
             math.setName("MATHEMATICS");
