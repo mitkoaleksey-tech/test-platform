@@ -87,6 +87,20 @@ EXAM_TYPE_MAP: dict[str, str] = {
     "Математика. Профильный уровень": "EGE",
 }
 
+MATH_EXCEL_COLUMNS: tuple[str, ...] = (
+    "external_id",
+    "subject",
+    "exam_type",
+    "task_bank",
+    "task_number",
+    "subtopic",
+    "question",
+    "image_files",
+    "correct_answer",
+    "has_detailed_answer",
+    "answer_type",
+)
+
 
 # ===========================================================================
 # 0. ВСПОМОГАТЕЛЬНЫЕ УТИЛИТЫ
@@ -1173,7 +1187,18 @@ def export_math_fipi_to_review_excel(
     # task_number, subtopic: пустые поля для ручной разметки
     df["task_number"] = df["task_number"].fillna("").astype(str) if "task_number" in df.columns else ""
     df["subtopic"]    = ""
-    df["has_detailed_answer"] = df.apply(lambda r: str(r.get("answer_type", "")).lower() in ("long", "extended", "free_response", "detailed"), axis=1)
+    df["answer_type"] = df["answer_type"].fillna("").astype(str) if "answer_type" in df.columns else ""
+    df["has_detailed_answer"] = df.apply(
+        lambda r: (
+            str(r.get("has_detailed_answer", "")).lower() in ("true", "1")
+            or str(r.get("answer_type", "")).lower() in ("long", "extended", "free_response", "detailed")
+            or "разверн" in str(r.get("answer_type", "")).lower()
+            or "изменить статус" in str(r.get("answer", "")).lower()
+            or "разверн" in str(r.get("answer", "")).lower()
+            or not str(r.get("answer", "")).strip()
+        ),
+        axis=1
+    )
 
     # question: очищенный и отформатированный текст задачи (без [рис.], с вариантами ответов и HTML таблицами)
     if "question" in df.columns:
@@ -1317,6 +1342,8 @@ def export_math_fipi_to_review_excel(
         "question":       {"width": 80,  "manual": False},
         "image_files":    {"width": 40,  "manual": False},
         "correct_answer": {"width": 18,  "manual": False},
+        "has_detailed_answer": {"width": 22, "manual": False},
+        "answer_type":    {"width": 18,  "manual": False},
     }
 
     # Строка 1: заголовки
