@@ -334,10 +334,10 @@ async function apiFetch(endpoint, options = {}) {
 
     const response = await fetch(endpoint, { ...options, headers });
 
-    if (response.status === 401 || (response.status === 403 && endpoint.startsWith('/api/admin'))) {
+    if (response.status === 401) {
         if (state.token) {
             logout();
-            throw new Error('Сессия истекла или недостаточно прав. Пожалуйста, войдите заново');
+            throw new Error('Сессия истекла. Пожалуйста, войдите заново');
         }
     }
 
