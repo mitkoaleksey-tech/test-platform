@@ -38,4 +38,6 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     long countByTaskBank(TaskBank taskBank);
 
     List<Task> findAllByOrderByCreatedAtDesc();
+
+    List<Task> findAllByOrderByIdDesc();
 }

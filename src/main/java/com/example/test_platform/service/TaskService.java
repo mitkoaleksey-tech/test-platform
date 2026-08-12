@@ -112,7 +112,7 @@ public class TaskService {
             Integer taskNumber,
             Boolean active
     ) {
-        List<Task> tasks = taskRepository.findAllByOrderByCreatedAtDesc();
+        List<Task> tasks = taskRepository.findAllByOrderByIdDesc();
 
         return tasks.stream()
                 .filter(task -> subject == null || task.getSubject() == subject)
