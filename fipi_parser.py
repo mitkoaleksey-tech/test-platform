@@ -547,10 +547,16 @@ def validate_latex_in_text(text: str) -> dict[str, object]:
 
     formulas = LATEX_PATTERN.findall(text)
 
+    # Исключаем валюту ($40,000, $5,000) и адресацию Excel (B$3, $C$2), чтобы избежать ложных срабатываний
+    clean_text = re.sub(r"\$\d[\d,.]*", "", text)
+    clean_text = re.sub(r"[A-Za-z]\$\d+", "", clean_text)
+    clean_text = re.sub(r"\$[A-Za-z]\$\d+", "", clean_text)
+    clean_text = re.sub(r"\$[A-Za-z]\b", "", clean_text)
+
     # Проверка незакрытых одиночных $: нечётное количество символов $
-    dollar_count = text.count("$")
+    dollar_count = clean_text.count("$")
     # Компенсируем парные $$ (каждая пара $$ = 2 символа $)
-    double_dollars = len(re.findall(r"\$\$", text)) * 2
+    double_dollars = len(re.findall(r"\$\$", clean_text)) * 2
     single_dollars = dollar_count - double_dollars
     unclosed = (single_dollars % 2) != 0
 
