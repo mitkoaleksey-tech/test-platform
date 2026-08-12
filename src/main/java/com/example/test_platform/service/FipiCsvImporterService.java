@@ -144,11 +144,20 @@ public class FipiCsvImporterService {
 
                     String answerType = getColValue(cols, headerMap, "answer_type");
                     String hasDetailedAnswerStr = getColValue(cols, headerMap, "has_detailed_answer");
+                    String normalizedAnswer = answer.trim().toLowerCase();
+
                     boolean hasDetailedAnswer = "true".equalsIgnoreCase(hasDetailedAnswerStr) || "1".equals(hasDetailedAnswerStr)
                             || answerType.equalsIgnoreCase("long")
                             || answerType.equalsIgnoreCase("extended")
                             || answerType.equalsIgnoreCase("free_response")
-                            || answerType.equalsIgnoreCase("detailed");
+                            || answerType.equalsIgnoreCase("detailed")
+                            || answerType.toLowerCase().contains("разверн")
+                            || normalizedAnswer.contains("изменить статус")
+                            || normalizedAnswer.contains("разверн")
+                            || normalizedAnswer.contains("ручная проверка")
+                            || normalizedAnswer.isBlank()
+                            || normalizedAnswer.equals("—")
+                            || normalizedAnswer.equals("-");
 
                     Task task = new Task();
                     task.setPublicId(generateUniquePublicId());

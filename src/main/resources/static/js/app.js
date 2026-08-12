@@ -142,6 +142,28 @@ function applyInputMasks() {
 
 // KaTeX LaTeX renderer helper
 function triggerKaTeX() {
+    // 0. Unwrap any FIPI pseudo-math tables before KaTeX renders!
+    try {
+        document.querySelectorAll('.task-content, .card, td').forEach(el => {
+            const mathTables = el.querySelectorAll('table.fipi-table, table');
+            mathTables.forEach(table => {
+                const text = table.textContent || '';
+                if (text.includes('$') || text.includes('\\frac') || text.includes('^2') || text.includes('x-a^2')) {
+                    let cleanMath = text.replace(/\s+/g, ' ').trim();
+                    if (!cleanMath.startsWith('$')) cleanMath = '$' + cleanMath + '$';
+                    cleanMath = cleanMath.replace(/\$\$/g, '$');
+                    const span = document.createElement('span');
+                    span.className = 'fipi-math-unwrapped';
+                    span.style.cssText = 'display: inline-block; margin: 0.4rem 0; font-size: 1.05rem;';
+                    span.textContent = cleanMath;
+                    if (table.parentNode) {
+                        table.parentNode.replaceChild(span, table);
+                    }
+                }
+            });
+        });
+    } catch (ignored) {}
+
     if (window.renderMathInElement) {
         try {
             window.renderMathInElement(document.body, {

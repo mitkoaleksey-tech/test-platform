@@ -14,8 +14,11 @@ public class FipiTextNormalizer {
             return text;
         }
 
+        // 0. Очистка псевдо-математических HTML-таблиц ФИПИ
+        String cleaned = cleanPseudoMathTables(text);
+
         // 1. Очистка невидимых символов Unicode, тире и кавычек
-        String cleaned = text.replaceAll("[\\u2061\\u2062\\u2063\\u2064\\u200b\\u200c\\u200d\\u200e\\u200f\\ufeff]", "")
+        cleaned = cleaned.replaceAll("[\\u2061\\u2062\\u2063\\u2064\\u200b\\u200c\\u200d\\u200e\\u200f\\ufeff]", "")
                 .replace('\u2009', ' ')
                 .replace('\u200a', ' ')
                 .replace('\u202f', ' ')
@@ -239,5 +242,34 @@ public class FipiTextNormalizer {
                 .replaceAll("\\\\[a-zA-Z]+", "");
 
         return pdfText.trim();
+    }
+
+    public static String cleanPseudoMathTables(String text) {
+        if (text == null || !text.contains("<table")) {
+            return text;
+        }
+
+        Pattern mathTablePattern = Pattern.compile("<table[^>]*>\\s*<tr>\\s*(?:<th[^>]*>.*?</th>|<td[^>]*>.*?</td>)+\\s*</tr>\\s*</table>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+        Matcher matcher = mathTablePattern.matcher(text);
+        StringBuffer sb = new StringBuffer();
+
+        while (matcher.find()) {
+            String tableContent = matcher.group(0);
+            if (tableContent.contains("$") || tableContent.contains("\\frac") || tableContent.contains("^2") || tableContent.contains("x-a^2") || tableContent.contains("fipi-table")) {
+                String cleanCells = tableContent.replaceAll("</?(?:table|tr|th|td)[^>]*>", " ")
+                        .replaceAll("\\s+", " ")
+                        .trim();
+                cleanCells = cleanCells.replace("$(", "$(").replace(")$", ")$");
+                if (!cleanCells.startsWith("$") && !cleanCells.startsWith("$$")) {
+                    cleanCells = "$" + cleanCells + "$";
+                }
+                cleanCells = cleanCells.replace("$$$", "$$").replace("$$", "$");
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(cleanCells));
+            } else {
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(tableContent));
+            }
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
     }
 }

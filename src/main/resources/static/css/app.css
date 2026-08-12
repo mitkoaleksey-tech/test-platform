@@ -415,12 +415,12 @@ textarea.form-control {
 }
 
 .fipi-table th {
-    background-color: var(--primary, #7b5a3e);
-    color: #ffffff;
+    background-color: var(--bg-hover, #f1f5f9);
+    color: var(--text-primary, #1e293b);
     font-weight: 600;
-    padding: 10px 14px;
-    text-align: left;
-    border-bottom: 2px solid #5a402a;
+    padding: 8px 12px;
+    text-align: center;
+    border-bottom: 1px solid var(--border-color, #cbd5e1);
 }
 
 .fipi-table td {

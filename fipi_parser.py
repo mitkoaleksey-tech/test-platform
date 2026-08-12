@@ -179,6 +179,17 @@ def clean_fipi_question_text(text: str, options_raw: object = None) -> str:
 
     cleaned = text
 
+    # 0. Распаковка псевдо-математических HTML таблиц ФИПИ (<table class="fipi-table">)
+    def _unwrap_fipi_math_table(m: re.Match) -> str:
+        table_html = m.group(0)
+        cells_text = re.sub(r'</?(?:table|tr|th|td)[^>]*>', ' ', table_html)
+        cells_text = re.sub(r'\s+', ' ', cells_text).strip()
+        if not cells_text.startswith('$'):
+            cells_text = f" ${cells_text}$ "
+        return f" {cells_text} "
+
+    cleaned = re.sub(r'<table[^>]*>\s*<tr>\s*(?:<th[^>]*>.*?</th>|<td[^>]*>.*?</td>)+\s*</tr>\s*</table>', _unwrap_fipi_math_table, cleaned, flags=re.DOTALL | re.IGNORECASE)
+
     # 1. Замена KaTeX <span class="katex">...<annotation encoding="application/x-tex">...
     def _replace_katex(m: re.Match) -> str:
         tex = m.group(1).strip()

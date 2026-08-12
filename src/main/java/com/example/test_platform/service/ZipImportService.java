@@ -176,6 +176,25 @@ public class ZipImportService {
                     task.setCorrectAnswer(answerStr);
                     task.setActive(true);
 
+                    String hasDetailedStr = getCellValue(row, 9);
+                    String answerTypeStr = getCellValue(row, 10);
+                    String normalizedAnswer = answerStr.trim().toLowerCase();
+
+                    boolean hasDetailed = "true".equalsIgnoreCase(hasDetailedStr) || "1".equals(hasDetailedStr)
+                            || answerTypeStr.equalsIgnoreCase("long")
+                            || answerTypeStr.equalsIgnoreCase("extended")
+                            || answerTypeStr.equalsIgnoreCase("free_response")
+                            || answerTypeStr.equalsIgnoreCase("detailed")
+                            || answerTypeStr.toLowerCase().contains("разверн")
+                            || normalizedAnswer.contains("изменить статус")
+                            || normalizedAnswer.contains("разверн")
+                            || normalizedAnswer.contains("ручная проверка")
+                            || normalizedAnswer.isBlank()
+                            || normalizedAnswer.equals("—")
+                            || normalizedAnswer.equals("-");
+
+                    task.setHasDetailedAnswer(hasDetailed);
+
                     // 4. Обработка картинок из папки images
                     if (!isNew && task.getImages() != null) {
                         task.getImages().clear();
