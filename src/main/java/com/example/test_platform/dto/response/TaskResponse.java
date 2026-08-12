@@ -26,6 +26,7 @@ public class TaskResponse {
     private final String content;
     private final String correctAnswer;
     private final boolean active;
+    private final boolean hasDetailedAnswer;
     private final List<TaskImageResponse> images;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
@@ -51,6 +52,7 @@ public class TaskResponse {
                 .content(task.getContent())
                 .correctAnswer(task.getCorrectAnswer())
                 .active(task.isActive())
+                .hasDetailedAnswer(task.isHasDetailedAnswer())
                 .images(imageResponses)
                 .createdAt(task.getCreatedAt())
                 .updatedAt(task.getUpdatedAt())

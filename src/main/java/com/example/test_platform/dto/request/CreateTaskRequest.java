@@ -38,4 +38,6 @@ public class CreateTaskRequest {
 
     @Size(max = 64)
     private String externalId;
+
+    private Boolean hasDetailedAnswer;
 }

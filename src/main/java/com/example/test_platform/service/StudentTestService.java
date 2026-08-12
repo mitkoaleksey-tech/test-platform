@@ -41,6 +41,8 @@ public class StudentTestService {
     private final StudentRepository studentRepository;
     private final TestAttemptRepository testAttemptRepository;
     private final StudentAnswerRepository studentAnswerRepository;
+    private final com.example.test_platform.repository.StudentAnswerAttachmentRepository studentAnswerAttachmentRepository;
+    private final com.example.test_platform.repository.TaskRepository taskRepository;
     private final com.example.test_platform.repository.StudentRetakePermissionRepository studentRetakePermissionRepository;
     private final StorageProperties storageProperties;
 
@@ -153,12 +155,13 @@ public class StudentTestService {
             String givenAnswer = givenAnswersMap.getOrDefault(task.getId(), "").trim();
             String correctAnswer = task.getCorrectAnswer();
 
-            boolean hasCorrectAnswer = correctAnswer != null && !correctAnswer.isBlank();
+            boolean isDetailed = task.isHasDetailedAnswer();
+            boolean hasCorrectAnswer = !isDetailed && correctAnswer != null && !correctAnswer.isBlank();
 
             StudentAnswerFeedbackDto.GradingStatus status;
             boolean isCorrect = false;
 
-            if (!hasCorrectAnswer) {
+            if (isDetailed || !hasCorrectAnswer) {
                 status = StudentAnswerFeedbackDto.GradingStatus.UNGRADED;
             } else {
                 gradableTasks++;
@@ -171,9 +174,13 @@ public class StudentTestService {
                 }
             }
 
-            StudentAnswer answerEntity = new StudentAnswer();
-            answerEntity.setAttempt(attempt);
-            answerEntity.setTask(task);
+            StudentAnswer answerEntity = studentAnswerRepository.findByAttemptIdAndTaskId(attempt.getId(), task.getId())
+                    .orElseGet(() -> {
+                        StudentAnswer sa = new StudentAnswer();
+                        sa.setAttempt(attempt);
+                        sa.setTask(task);
+                        return sa;
+                    });
             answerEntity.setAnswerText(givenAnswer);
             answerEntity.setCorrect(isCorrect);
             studentAnswerRepository.save(answerEntity);
@@ -208,6 +215,113 @@ public class StudentTestService {
                 .scorePercent(scorePercent)
                 .feedback(feedbackList)
                 .build();
+    }
+
+    @Transactional
+    public com.example.test_platform.dto.response.StudentAnswerAttachmentResponse uploadStudentAttachment(
+            String accessToken, Long attemptId, Long taskId, org.springframework.web.multipart.MultipartFile file) {
+        TestVariant variant = getVariantByAccessToken(accessToken);
+        TestAttempt attempt = testAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Test attempt not found"));
+
+        if (!attempt.getTestVariant().getId().equals(variant.getId())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Attempt does not belong to this test variant");
+        }
+
+        if (attempt.getCompletedAt() != null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Test attempt has already been submitted");
+        }
+
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Task not found"));
+
+        StudentAnswer sa = studentAnswerRepository.findByAttemptIdAndTaskId(attemptId, taskId)
+                .orElseGet(() -> {
+                    StudentAnswer newSa = new StudentAnswer();
+                    newSa.setAttempt(attempt);
+                    newSa.setTask(task);
+                    return studentAnswerRepository.save(newSa);
+                });
+
+        String originalFilename = file.getOriginalFilename() != null && !file.getOriginalFilename().isBlank()
+                ? file.getOriginalFilename()
+                : "attachment";
+        String ext = getFileExtension(originalFilename);
+        String storedFilename = java.util.UUID.randomUUID() + ext;
+
+        java.nio.file.Path targetDir = java.nio.file.Path.of(storageProperties.getImagesPath(), "student_answers", String.valueOf(attemptId));
+        try {
+            java.nio.file.Files.createDirectories(targetDir);
+            java.nio.file.Path targetPath = targetDir.resolve(storedFilename);
+            java.nio.file.Files.copy(file.getInputStream(), targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (java.io.IOException e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to save attachment file");
+        }
+
+        String relativePath = "student_answers/" + attemptId + "/" + storedFilename;
+        String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
+
+        com.example.test_platform.domain.entity.StudentAnswerAttachment attachment =
+                new com.example.test_platform.domain.entity.StudentAnswerAttachment();
+        attachment.setFilePath(relativePath);
+        attachment.setOriginalFilename(originalFilename);
+        attachment.setContentType(contentType);
+        sa.addAttachment(attachment);
+
+        com.example.test_platform.domain.entity.StudentAnswerAttachment saved =
+                studentAnswerAttachmentRepository.save(attachment);
+
+        boolean isImage = contentType.startsWith("image/") || isImageExtension(ext);
+        String fileUrl = "/api/public/attachments/" + relativePath;
+
+        return com.example.test_platform.dto.response.StudentAnswerAttachmentResponse.builder()
+                .id(saved.getId())
+                .originalFilename(originalFilename)
+                .fileUrl(fileUrl)
+                .contentType(contentType)
+                .isImage(isImage)
+                .build();
+    }
+
+    @Transactional
+    public void deleteStudentAttachment(String accessToken, Long attemptId, Long taskId, Long attachmentId) {
+        TestVariant variant = getVariantByAccessToken(accessToken);
+        TestAttempt attempt = testAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Test attempt not found"));
+
+        if (!attempt.getTestVariant().getId().equals(variant.getId())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Attempt does not belong to this test variant");
+        }
+
+        if (attempt.getCompletedAt() != null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Test attempt has already been submitted");
+        }
+
+        com.example.test_platform.domain.entity.StudentAnswerAttachment attachment =
+                studentAnswerAttachmentRepository.findById(attachmentId)
+                        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Attachment not found"));
+
+        if (!attachment.getStudentAnswer().getAttempt().getId().equals(attemptId)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Attachment does not belong to this attempt");
+        }
+
+        try {
+            java.nio.file.Path filePath = java.nio.file.Path.of(storageProperties.getImagesPath()).resolve(attachment.getFilePath());
+            java.nio.file.Files.deleteIfExists(filePath);
+        } catch (java.io.IOException ignored) {}
+
+        attachment.getStudentAnswer().removeAttachment(attachment);
+        studentAnswerAttachmentRepository.delete(attachment);
+    }
+
+    private String getFileExtension(String filename) {
+        int idx = filename.lastIndexOf('.');
+        return idx >= 0 ? filename.substring(idx) : ".bin";
+    }
+
+    private boolean isImageExtension(String ext) {
+        String lower = ext.toLowerCase(Locale.ROOT);
+        return lower.equals(".png") || lower.equals(".jpg") || lower.equals(".jpeg") || lower.equals(".gif") || lower.equals(".webp");
     }
 
     private TestVariant getVariantByAccessToken(String accessToken) {

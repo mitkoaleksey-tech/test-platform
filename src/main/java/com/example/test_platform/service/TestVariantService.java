@@ -220,6 +220,21 @@ public class TestVariantService {
                     .map(img -> "/api/public/images/" + img.getFilePath())
                     .toList() : List.of();
 
+            List<com.example.test_platform.dto.response.StudentAnswerAttachmentResponse> attachments = List.of();
+            if (sa != null && sa.getAttachments() != null) {
+                try {
+                    attachments = sa.getAttachments().stream()
+                            .map(att -> com.example.test_platform.dto.response.StudentAnswerAttachmentResponse.builder()
+                                    .id(att.getId())
+                                    .originalFilename(att.getOriginalFilename())
+                                    .fileUrl("/api/public/attachments/" + att.getFilePath())
+                                    .contentType(att.getContentType())
+                                    .isImage(att.getContentType() != null && att.getContentType().startsWith("image/"))
+                                    .build())
+                            .toList();
+                } catch (Exception ignored) {}
+            }
+
             detailDtos.add(com.example.test_platform.dto.response.AttemptGradingDetailsResponse.StudentAnswerDetailDto.builder()
                     .taskId(task.getId())
                     .publicId(task.getPublicId())
@@ -230,7 +245,9 @@ public class TestVariantService {
                     .givenAnswer(sa != null ? sa.getAnswerText() : "")
                     .correctAnswer(task.getCorrectAnswer())
                     .isCorrect(sa != null ? sa.isCorrect() : null)
+                    .hasDetailedAnswer(task.isHasDetailedAnswer())
                     .imageUrls(imageUrls)
+                    .attachments(attachments)
                     .maxScore(maxScore)
                     .manualScore(sa != null ? sa.getManualScore() : null)
                     .build());

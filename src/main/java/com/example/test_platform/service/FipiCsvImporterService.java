@@ -142,6 +142,14 @@ public class FipiCsvImporterService {
 
                     int taskNumber = parseTaskNumber(taskNumberStr, codifierCodesStr);
 
+                    String answerType = getColValue(cols, headerMap, "answer_type");
+                    String hasDetailedAnswerStr = getColValue(cols, headerMap, "has_detailed_answer");
+                    boolean hasDetailedAnswer = "true".equalsIgnoreCase(hasDetailedAnswerStr) || "1".equals(hasDetailedAnswerStr)
+                            || answerType.equalsIgnoreCase("long")
+                            || answerType.equalsIgnoreCase("extended")
+                            || answerType.equalsIgnoreCase("free_response")
+                            || answerType.equalsIgnoreCase("detailed");
+
                     Task task = new Task();
                     task.setPublicId(generateUniquePublicId());
                     task.setExternalId(externalId);
@@ -153,6 +161,7 @@ public class FipiCsvImporterService {
                     task.setContent(FipiTextNormalizer.normalize(content));
                     task.setCorrectAnswer(answer);
                     task.setActive(true);
+                    task.setHasDetailedAnswer(hasDetailedAnswer);
 
                     Task savedTask = taskRepository.save(task);
                     inserted++;

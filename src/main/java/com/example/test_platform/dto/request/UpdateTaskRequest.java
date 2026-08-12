@@ -37,4 +37,6 @@ public class UpdateTaskRequest {
     private String correctAnswer;
 
     private boolean active = true;
+
+    private Boolean hasDetailedAnswer;
 }

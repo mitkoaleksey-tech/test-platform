@@ -1042,7 +1042,7 @@ async function loadAdminTasksTab(container, forceRefresh = false) {
                             <td style="padding: 1rem;"><span class="badge badge-warning">Задание №${t.taskNumber || '—'}</span></td>
                             <td style="padding: 1rem;">${t.subtopic || '—'}</td>
                             <td style="padding: 1rem;"><span class="badge badge-info">${t.taskBank}</span></td>
-                            <td style="padding: 1rem;"><code>${t.correctAnswer || '—'}</code></td>
+                            <td style="padding: 1rem;">${t.hasDetailedAnswer ? '<span class="badge badge-warning" title="Задача с развёрнутым ответом">Развёрнутый</span>' : `<code>${t.correctAnswer || '—'}</code>`}</td>
                             <td style="padding: 1rem;">
                                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
                                     <button id="btn-expand-task-${t.id}" onclick="toggleTaskInspector(${t.id})" class="btn btn-secondary btn-sm">Развернуть</button>
@@ -1201,6 +1201,11 @@ function renderEditTaskModal(id) {
                         <input type="text" id="edit-task-correct-answer" class="form-control" value="${task.correctAnswer || ''}">
                     </div>
 
+                    <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; background: var(--bg-hover); padding: 0.6rem 0.8rem; border-radius: 0.4rem; border: 1px solid var(--border-color);">
+                        <input type="checkbox" id="edit-task-has-detailed-answer" ${task.hasDetailedAnswer ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
+                        <label for="edit-task-has-detailed-answer" class="form-label" style="margin: 0; cursor: pointer; font-weight: 600;">☑️ Задача с развёрнутым ответом (ручная проверка)</label>
+                    </div>
+
                     <div class="form-group">
                         <label class="form-label">Прикрепить новый чертёж / изображение (опционально)</label>
                         <input type="file" id="edit-task-image-file" class="form-control" accept="image/*">
@@ -1226,12 +1231,13 @@ function renderEditTaskModal(id) {
         const subtopic = document.getElementById('edit-task-subtopic').value.trim();
         const content = document.getElementById('edit-task-content').value.trim();
         const correctAnswer = document.getElementById('edit-task-correct-answer').value.trim();
+        const hasDetailedAnswer = document.getElementById('edit-task-has-detailed-answer').checked;
 
         try {
             const updatedTask = await apiFetch(`/api/admin/tasks/${id}`, {
                 method: 'PUT',
                 body: JSON.stringify({
-                    subject, examType, taskBank, taskNumber, subtopic, content, correctAnswer, active: true
+                    subject, examType, taskBank, taskNumber, subtopic, content, correctAnswer, hasDetailedAnswer, active: true
                 })
             });
 
@@ -1331,6 +1337,11 @@ function renderCreateTaskModal() {
                         <input type="text" id="task-correct-answer" class="form-control" placeholder="25">
                     </div>
 
+                    <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; background: var(--bg-hover); padding: 0.6rem 0.8rem; border-radius: 0.4rem; border: 1px solid var(--border-color);">
+                        <input type="checkbox" id="task-has-detailed-answer" style="width: 18px; height: 18px; cursor: pointer;">
+                        <label for="task-has-detailed-answer" class="form-label" style="margin: 0; cursor: pointer; font-weight: 600;">☑️ Задача с развёрнутым ответом (ручная проверка)</label>
+                    </div>
+
                     <div class="form-group">
                         <label class="form-label">Прикрепить чертёж / изображение к заданию (опционально)</label>
                         <input type="file" id="task-image-file" class="form-control" accept="image/*">
@@ -1356,12 +1367,13 @@ function renderCreateTaskModal() {
         const subtopic = document.getElementById('task-subtopic').value.trim();
         const content = document.getElementById('task-content').value.trim();
         const correctAnswer = document.getElementById('task-correct-answer').value.trim();
+        const hasDetailedAnswer = document.getElementById('task-has-detailed-answer').checked;
 
         try {
             const savedTask = await apiFetch('/api/admin/tasks', {
                 method: 'POST',
                 body: JSON.stringify({
-                    subject, examType, taskBank, taskNumber, subtopic, content, correctAnswer
+                    subject, examType, taskBank, taskNumber, subtopic, content, correctAnswer, hasDetailedAnswer
                 })
             });
 
@@ -2287,20 +2299,23 @@ async function renderAttemptGradingModal(variantId, attemptId) {
     try {
         const details = await apiFetch(`/api/teacher/variants/${variantId}/attempts/${attemptId}`);
 
-        // Separate auto-graded (has correctAnswer) from open-ended tasks
+        // Separate auto-graded (has correctAnswer and not detailed) from open-ended tasks
         const answers = details.answers || [];
-        const openAnswers = answers.filter(ans => !ans.correctAnswer);
-        const autoAnswers = answers.filter(ans => !!ans.correctAnswer);
+        const openAnswers = answers.filter(ans => ans.hasDetailedAnswer || !ans.correctAnswer);
+        const autoAnswers = answers.filter(ans => !ans.hasDetailedAnswer && !!ans.correctAnswer);
 
         // Build per-task score inputs HTML for open-ended tasks
         const openInputsHtml = openAnswers.length ? `
             <div style="margin-bottom: 1.2rem;">
-                <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.8rem; color: var(--text-secondary);">📝 Открытые задания — выставьте баллы:</h3>
+                <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.8rem; color: var(--text-secondary);">📝 Открытые задания / Задания с развёрнутым ответом — выставьте баллы:</h3>
                 ${openAnswers.map(ans => `
                     <div style="padding: 0.8rem; border: 1px solid var(--border-color); border-radius: 0.6rem; margin-bottom: 0.8rem; background: var(--bg-hover);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                             <strong>Задание №${ans.itemIndex} <code style="font-size:0.8rem;">[${ans.publicId}] №${ans.taskNumber} КИМ</code></strong>
-                            <span class="badge badge-warning">Макс. балл: ${ans.maxScore || 1}</span>
+                            <div>
+                                ${ans.hasDetailedAnswer ? '<span class="badge badge-info" style="margin-right: 0.4rem;">Развёрнутый ответ</span>' : ''}
+                                <span class="badge badge-warning">Макс. балл: ${ans.maxScore || 1}</span>
+                            </div>
                         </div>
                         <div class="task-content" style="margin-bottom: 0.6rem; padding: 0.5rem; background: var(--bg-card); border-radius: 0.3rem; font-size: 0.9rem;">${ans.content}</div>
                         ${(ans.imageUrls && ans.imageUrls.length) ? `
@@ -2308,18 +2323,35 @@ async function renderAttemptGradingModal(variantId, attemptId) {
                                 ${ans.imageUrls.map(url => `<img src="${url}" style="max-height: 120px; border-radius: 0.3rem; border: 1px solid var(--border-color);">`).join('')}
                             </div>
                         ` : ''}
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; font-size: 0.9rem; margin-bottom: 0.6rem;">
-                            <div>
-                                <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 0.2rem;">Ответ ученика:</div>
-                                <div style="padding: 0.4rem; background: var(--bg-main); border-radius: 0.3rem; font-family: monospace;">${ans.givenAnswer || '<em>Не предоставлен</em>'}</div>
+
+                        <div style="margin-bottom: 0.6rem;">
+                            <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 0.2rem;">Ответ / решение ученика:</div>
+                            <div style="padding: 0.6rem; background: var(--bg-main); border-radius: 0.4rem; border: 1px solid var(--border-color); white-space: pre-wrap; font-family: inherit; font-size: 0.95rem;">${ans.givenAnswer || '<em>Текстовый ответ не введён</em>'}</div>
+                        </div>
+
+                        ${(ans.attachments && ans.attachments.length) ? `
+                            <div style="margin-bottom: 0.8rem;">
+                                <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 0.3rem; font-size: 0.85rem;">📎 Прикреплённые файлы / фото работы (${ans.attachments.length}):</div>
+                                <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center;">
+                                    ${ans.attachments.map(att => att.isImage ? `
+                                        <a href="${att.fileUrl}" target="_blank" style="text-decoration: none;">
+                                            <img src="${att.fileUrl}" alt="${att.originalFilename}" title="Открыть в полном размере" style="max-height: 140px; border-radius: 0.4rem; border: 1px solid var(--border-color); cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+                                        </a>
+                                    ` : `
+                                        <a href="${att.fileUrl}" target="_blank" class="btn btn-sm btn-secondary" style="display: inline-flex; align-items: center; gap: 0.3rem; text-decoration: none;">
+                                            📄 Скачать ${att.originalFilename}
+                                        </a>
+                                    `).join('')}
+                                </div>
                             </div>
-                            <div>
-                                <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 0.2rem;">Выставить балл (0 – ${ans.maxScore || 1}):</div>
-                                <input type="number" id="task-score-${ans.taskId}" data-task-id="${ans.taskId}" data-max-score="${ans.maxScore || 1}"
-                                    class="form-control task-score-input" style="width: 90px;"
-                                    value="${ans.manualScore !== null && ans.manualScore !== undefined ? ans.manualScore : 0}"
-                                    min="0" max="${ans.maxScore || 1}" step="1">
-                            </div>
+                        ` : ''}
+
+                        <div style="display: flex; align-items: center; gap: 0.8rem; font-size: 0.9rem; margin-top: 0.6rem;">
+                            <div style="font-weight: 600; color: var(--text-secondary);">Выставить балл (0 – ${ans.maxScore || 1}):</div>
+                            <input type="number" id="task-score-${ans.taskId}" data-task-id="${ans.taskId}" data-max-score="${ans.maxScore || 1}"
+                                class="form-control task-score-input" style="width: 90px;"
+                                value="${ans.manualScore !== null && ans.manualScore !== undefined ? ans.manualScore : 0}"
+                                min="0" max="${ans.maxScore || 1}" step="1">
                         </div>
                     </div>
                 `).join('')}
@@ -2551,13 +2583,47 @@ function renderStudentSolvingScreen() {
                             </div>
                         ` : ''}
 
-                        <div class="form-group" style="margin-top: 1rem;">
-                            <label class="form-label">Ваш ответ:</label>
-                            <input type="text" class="form-control" style="max-width: 300px;" 
-                                   placeholder="Введите ответ" 
-                                   value="${state.studentAnswers[task.id] || ''}"
-                                   onchange="saveStudentAnswer(${task.id}, this.value)">
-                        </div>
+                        ${task.hasDetailedAnswer ? `
+                            <div class="form-group" style="margin-top: 1rem;">
+                                <label class="form-label" style="font-weight: 600; color: var(--primary-color);">📝 Ваш развёрнутый ответ / решение:</label>
+                                <textarea class="form-control" rows="5"
+                                       placeholder="Введите подробное решение, ответ или пояснения..."
+                                       onchange="saveStudentAnswer(${task.id}, this.value)"
+                                       oninput="saveStudentAnswer(${task.id}, this.value)">${state.studentAnswers[task.id] || ''}</textarea>
+
+                                <div style="margin-top: 0.8rem; padding: 0.8rem; background: var(--bg-hover); border-radius: 0.5rem; border: 1px dashed var(--border-color);">
+                                    <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary);">
+                                        📎 Прикрепить файл решения или сделать фото работы:
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                                        <label class="btn btn-sm btn-secondary" style="margin: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;">
+                                            📎 Выбрать файл (изображение / PDF)
+                                            <input type="file" style="display: none;" accept="image/*,application/pdf" onchange="uploadStudentAttachment(${task.id}, this)">
+                                        </label>
+                                        <label class="btn btn-sm btn-secondary" style="margin: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;">
+                                            📷 Сделать фото
+                                            <input type="file" style="display: none;" accept="image/*" capture="environment" onchange="uploadStudentAttachment(${task.id}, this)">
+                                        </label>
+                                    </div>
+                                    <div id="attachments-list-${task.id}" style="margin-top: 0.6rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                        ${((state.studentAttachments && state.studentAttachments[task.id]) || []).map(att => `
+                                            <div class="badge" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.4rem 0.6rem; display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem;">
+                                                ${att.isImage ? `📷` : `📄`} <span>${att.originalFilename}</span>
+                                                <button type="button" onclick="deleteStudentAttachment(${task.id}, ${att.id})" style="background: none; border: none; color: var(--danger); cursor: pointer; padding: 0; margin-left: 0.3rem; font-weight: bold;">✖</button>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        ` : `
+                            <div class="form-group" style="margin-top: 1rem;">
+                                <label class="form-label">Ваш ответ:</label>
+                                <input type="text" class="form-control" style="max-width: 300px;" 
+                                       placeholder="Введите ответ" 
+                                       value="${state.studentAnswers[task.id] || ''}"
+                                       onchange="saveStudentAnswer(${task.id}, this.value)">
+                            </div>
+                        `}
                     </div>
                 `).join('')}
 
@@ -2575,6 +2641,54 @@ function renderStudentSolvingScreen() {
 
 function saveStudentAnswer(taskId, value) {
     state.studentAnswers[taskId] = value;
+}
+
+async function uploadStudentAttachment(taskId, inputElem) {
+    if (!inputElem.files || inputElem.files.length === 0) return;
+    const file = inputElem.files[0];
+    const accessToken = state.studentTest.accessToken;
+    const attemptId = state.studentAttempt.attemptId;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const attachment = await fetch(`/api/public/tests/${accessToken}/attempts/${attemptId}/tasks/${taskId}/attachments`, {
+            method: 'POST',
+            body: formData
+        }).then(r => {
+            if (!r.ok) throw new Error('Ошибка загрузки файла');
+            return r.json();
+        });
+
+        state.studentAttachments = state.studentAttachments || {};
+        state.studentAttachments[taskId] = state.studentAttachments[taskId] || [];
+        state.studentAttachments[taskId].push(attachment);
+
+        renderStudentSolvingScreen();
+        showToast('Файл прикреплён!');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+async function deleteStudentAttachment(taskId, attachmentId) {
+    const accessToken = state.studentTest.accessToken;
+    const attemptId = state.studentAttempt.attemptId;
+
+    try {
+        await apiFetch(`/api/public/tests/${accessToken}/attempts/${attemptId}/tasks/${taskId}/attachments/${attachmentId}`, {
+            method: 'DELETE'
+        });
+
+        if (state.studentAttachments && state.studentAttachments[taskId]) {
+            state.studentAttachments[taskId] = state.studentAttachments[taskId].filter(a => a.id !== attachmentId);
+        }
+        renderStudentSolvingScreen();
+        showToast('Файл удалён');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
 }
 
 async function submitStudentTest() {

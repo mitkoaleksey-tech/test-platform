@@ -56,6 +56,9 @@ public class Task extends BaseEntity {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "has_detailed_answer", nullable = false)
+    private boolean hasDetailedAnswer = false;
+
     @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
     private List<TaskImage> images = new ArrayList<>();

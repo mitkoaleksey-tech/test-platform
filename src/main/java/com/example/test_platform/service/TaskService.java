@@ -56,7 +56,7 @@ public class TaskService {
         task.setExternalId(request.getExternalId());
         applyTaskData(task, request.getSubject(), request.getTaskBank(), request.getExamType(),
                 request.getTaskNumber(), request.getSubtopic(), request.getContent(),
-                request.getCorrectAnswer(), true);
+                request.getCorrectAnswer(), true, Boolean.TRUE.equals(request.getHasDetailedAnswer()));
 
         return TaskResponse.from(taskRepository.save(task), storageProperties);
     }
@@ -66,7 +66,8 @@ public class TaskService {
         Task task = getTaskEntity(id);
         applyTaskData(task, request.getSubject(), request.getTaskBank(), request.getExamType(),
                 request.getTaskNumber(), request.getSubtopic(), request.getContent(),
-                request.getCorrectAnswer(), request.isActive());
+                request.getCorrectAnswer(), request.isActive(),
+                request.getHasDetailedAnswer() != null ? request.getHasDetailedAnswer() : task.isHasDetailedAnswer());
 
         return TaskResponse.from(taskRepository.save(task), storageProperties);
     }
@@ -139,7 +140,8 @@ public class TaskService {
             String subtopic,
             String content,
             String correctAnswer,
-            boolean active
+            boolean active,
+            boolean hasDetailedAnswer
     ) {
         task.setSubject(subject);
         task.setTaskBank(taskBank);
@@ -149,6 +151,7 @@ public class TaskService {
         task.setContent(com.example.test_platform.util.FipiTextNormalizer.normalize(content));
         task.setCorrectAnswer(correctAnswer);
         task.setActive(active);
+        task.setHasDetailedAnswer(hasDetailedAnswer);
     }
 }
 

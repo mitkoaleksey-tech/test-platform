@@ -38,4 +38,17 @@ public class StudentAnswer extends BaseEntity {
 
     @Column
     private Integer manualScore;
+
+    @jakarta.persistence.OneToMany(mappedBy = "studentAnswer", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<StudentAnswerAttachment> attachments = new java.util.ArrayList<>();
+
+    public void addAttachment(StudentAnswerAttachment attachment) {
+        attachments.add(attachment);
+        attachment.setStudentAnswer(this);
+    }
+
+    public void removeAttachment(StudentAnswerAttachment attachment) {
+        attachments.remove(attachment);
+        attachment.setStudentAnswer(null);
+    }
 }

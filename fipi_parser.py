@@ -743,6 +743,16 @@ def get_fipi_tasks(df_tasks: pd.DataFrame) -> pd.DataFrame:
     if question_col:
         df = validate_latex_column(df, column=question_col)
 
+    # Добавление флага задачи с развернутым ответом
+    def _check_detailed(row: pd.Series) -> bool:
+        ans_type = str(row.get("answer_type", "")).lower() if "answer_type" in row else ""
+        if ans_type in ("long", "extended", "free_response", "detailed"):
+            return True
+        has_det = row.get("has_detailed_answer", False) if "has_detailed_answer" in row else False
+        return str(has_det).lower() in ("true", "1", "yes")
+
+    df["has_detailed_answer"] = df.apply(_check_detailed, axis=1)
+
     print(f"[get_fipi_tasks] Итоговых чистых ФИПИ-заданий: {len(df):,}", flush=True)
     return df
 
@@ -1152,6 +1162,7 @@ def export_math_fipi_to_review_excel(
     # task_number, subtopic: пустые поля для ручной разметки
     df["task_number"] = df["task_number"].fillna("").astype(str) if "task_number" in df.columns else ""
     df["subtopic"]    = ""
+    df["has_detailed_answer"] = df.apply(lambda r: str(r.get("answer_type", "")).lower() in ("long", "extended", "free_response", "detailed"), axis=1)
 
     # question: очищенный и отформатированный текст задачи (без [рис.], с вариантами ответов и HTML таблицами)
     if "question" in df.columns:

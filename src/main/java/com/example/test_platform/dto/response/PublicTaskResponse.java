@@ -16,6 +16,7 @@ public class PublicTaskResponse {
     private final Integer taskNumber;
     private final String subtopic;
     private final String content;
+    private final boolean hasDetailedAnswer;
     private final List<TaskImageResponse> images;
 
     public static PublicTaskResponse from(Task task, StorageProperties storageProperties) {
@@ -25,6 +26,7 @@ public class PublicTaskResponse {
                 .taskNumber(task.getTaskNumber())
                 .subtopic(task.getSubtopic())
                 .content(task.getContent())
+                .hasDetailedAnswer(task.isHasDetailedAnswer())
                 .images(task.getImages().stream()
                         .map(image -> TaskImageResponse.from(image, storageProperties))
                         .toList())

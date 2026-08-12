@@ -31,7 +31,9 @@ public class AttemptGradingDetailsResponse {
         private final String givenAnswer;
         private final String correctAnswer;
         private final Boolean isCorrect;
+        private final boolean hasDetailedAnswer;
         private final List<String> imageUrls;
+        private final List<StudentAnswerAttachmentResponse> attachments;
         private final Integer maxScore;
         private final Integer manualScore;
     }

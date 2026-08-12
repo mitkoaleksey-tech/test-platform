@@ -9,6 +9,8 @@ public interface StudentAnswerRepository extends JpaRepository<StudentAnswer, Lo
 
     List<StudentAnswer> findByAttemptIdOrderByTaskIdAsc(Long attemptId);
 
+    java.util.Optional<StudentAnswer> findByAttemptIdAndTaskId(Long attemptId, Long taskId);
+
     void deleteByAttemptId(Long attemptId);
 
     void deleteByTaskId(Long taskId);
