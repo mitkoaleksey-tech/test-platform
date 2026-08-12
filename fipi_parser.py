@@ -962,6 +962,8 @@ MATH_EXCEL_COLUMNS: list[str] = [
     "question",      # Текст задачи (LaTeX)
     "image_files",   # Ссылки на картинки через запятую
     "correct_answer",# Ответ, если есть
+    "has_detailed_answer", # Признак развёрнутого ответа
+    "answer_type",   # Тип ответа из датасета
 ]
 
 
