@@ -112,53 +112,39 @@ public class ZipImportService {
             // 3. Чтение таблицы tasks.xlsx через Apache POI
             try (Workbook workbook = WorkbookFactory.create(excelPath.toFile())) {
                 Sheet sheet = workbook.getSheetAt(0);
+                Map<String, Integer> colMap = new HashMap<>();
                 boolean isHeader = true;
                 int totalRowsInSheet = sheet.getLastRowNum();
 
                 for (Row row : sheet) {
                     if (isHeader) {
-                        isHeader = false; // Пропускаем заголовок таблицы
+                        isHeader = false; // Парсим заголовки столбцов из первой строки таблицы
+                        for (Cell cell : row) {
+                            String colName = getCellValue(row, cell.getColumnIndex()).toLowerCase().trim();
+                            if (!colName.isBlank()) {
+                                colMap.put(colName, cell.getColumnIndex());
+                            }
+                        }
                         continue;
                     }
 
-                    String extId = getCellValue(row, 0);
-                    String subjStr = getCellValue(row, 1);
-                    String examStr = getCellValue(row, 2);
-                    String bankStr = getCellValue(row, 3);
-                    String taskNumStr = getCellValue(row, 4);
+                    // Чтение ячеек по динамической карте заголовков (с резервными фоллбэками для любых версий файла)
+                    int questionDefaultIdx = (colMap.containsKey("question") ? colMap.get("question") : (colMap.size() >= 14 ? 9 : 6));
 
-                    // Детекция формата: 14 колонок (новый) vs 11/9 колонок (старый)
-                    int lastCell = row.getLastCellNum();
-                    String taskVariantStr = "";
-                    String topicStr = "";
-                    String subtopicStr = "";
-                    String taskTypeStr = "";
-                    String questionStr = "";
-                    String imageFilesStr = "";
-                    String answerStr = "";
-                    String hasDetailedStr = "";
-                    String answerTypeStr = "";
-
-                    if (lastCell >= 14 || (lastCell >= 10 && getCellValue(row, 9).length() > 5)) {
-                        // Новый 14-колоночный формат
-                        taskVariantStr = getCellValue(row, 5);
-                        topicStr       = getCellValue(row, 6);
-                        subtopicStr    = getCellValue(row, 7);
-                        taskTypeStr    = getCellValue(row, 8);
-                        questionStr    = getCellValue(row, 9);
-                        imageFilesStr  = getCellValue(row, 10);
-                        answerStr      = getCellValue(row, 11);
-                        hasDetailedStr = getCellValue(row, 12);
-                        answerTypeStr  = getCellValue(row, 13);
-                    } else {
-                        // Старый 9/11-колоночный формат
-                        subtopicStr    = getCellValue(row, 5);
-                        questionStr    = getCellValue(row, 6);
-                        imageFilesStr  = getCellValue(row, 7);
-                        answerStr      = getCellValue(row, 8);
-                        hasDetailedStr = getCellValue(row, 9);
-                        answerTypeStr  = getCellValue(row, 10);
-                    }
+                    String extId          = getCellValueByName(row, colMap, "external_id", 0);
+                    String subjStr        = getCellValueByName(row, colMap, "subject", 1);
+                    String examStr        = getCellValueByName(row, colMap, "exam_type", 2);
+                    String bankStr        = getCellValueByName(row, colMap, "task_bank", 3);
+                    String taskNumStr     = getCellValueByName(row, colMap, "task_number", 4);
+                    String taskVariantStr = getCellValueByName(row, colMap, "task_variant", -1);
+                    String topicStr       = getCellValueByName(row, colMap, "topic", -1);
+                    String subtopicStr    = getCellValueByName(row, colMap, "subtopic", questionDefaultIdx == 9 ? 7 : 5);
+                    String taskTypeStr    = getCellValueByName(row, colMap, "task_type", -1);
+                    String questionStr    = getCellValueByName(row, colMap, "question", questionDefaultIdx);
+                    String imageFilesStr  = getCellValueByName(row, colMap, "image_files", questionDefaultIdx == 9 ? 10 : 7);
+                    String answerStr      = getCellValueByName(row, colMap, "correct_answer", questionDefaultIdx == 9 ? 11 : 8);
+                    String hasDetailedStr = getCellValueByName(row, colMap, "has_detailed_answer", questionDefaultIdx == 9 ? 12 : 9);
+                    String answerTypeStr  = getCellValueByName(row, colMap, "answer_type", questionDefaultIdx == 9 ? 13 : 10);
 
                     if (subjStr.isBlank() && questionStr.isBlank()) {
                         continue; // Пустая строка
@@ -302,9 +288,21 @@ public class ZipImportService {
     private final org.apache.poi.ss.usermodel.DataFormatter dataFormatter = new org.apache.poi.ss.usermodel.DataFormatter();
 
     private String getCellValue(Row row, int index) {
+        if (index < 0) return "";
         Cell cell = row.getCell(index);
         if (cell == null) return "";
         return dataFormatter.formatCellValue(cell).trim();
+    }
+
+    private String getCellValueByName(Row row, Map<String, Integer> colMap, String columnName, int defaultIndex) {
+        Integer colIdx = colMap.get(columnName);
+        if (colIdx != null && colIdx >= 0) {
+            return getCellValue(row, colIdx);
+        }
+        if (defaultIndex >= 0) {
+            return getCellValue(row, defaultIndex);
+        }
+        return "";
     }
 
     private Subject parseSubject(String str) {
